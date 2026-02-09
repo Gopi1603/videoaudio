@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}{{ media.original_filename }} — SecureMedia{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('media.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item active">{{ media.original_filename }}</li>
+  </ol>
+</nav>
+
+<div class="row g-4">
+  <!-- Main info card -->
+  <div class="col-lg-7">
+    <div class="card p-4">
+      <div class="d-flex align-items-center mb-3">
+        {% if media.mime_type and 'video' in media.mime_type %}
+          <i class="bi bi-film me-3" style="font-size:2.5rem;color:var(--sm-primary)"></i>
+        {% else %}
+          <i class="bi bi-music-note-beamed me-3" style="font-size:2.5rem;color:var(--sm-primary)"></i>
+        {% endif %}
+        <div>
+          <h4 class="mb-0 fw-bold">{{ media.original_filename }}</h4>
+          <small class="text-muted">Uploaded by {{ media.owner.username }}</small>
+        </div>
+      </div>
+
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+          <div class="text-muted small text-uppercase">Size</div>
+          <div class="fw-semibold">{{ "%.2f"|format(media.file_size / 1048576) }} MB</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted small text-uppercase">Type</div>
+          <div class="fw-semibold">{{ media.mime_type or 'unknown' }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted small text-uppercase">Status</div>
+          <span class="badge bg-{{ 'success' if media.status == 'encrypted' else 'danger' }}">
+            <i class="bi bi-{{ 'lock-fill' if media.status == 'encrypted' else 'unlock' }} me-1"></i>
+            {{ media.status }}
+          </span>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="text-muted small text-uppercase">Uploaded</div>
+          <div class="fw-semibold">{{ media.created_at.strftime('%b %d, %Y') }}</div>
+        </div>
+      </div>
+
+      <!-- Watermark section -->
+      <div class="p-3 rounded" style="background:var(--sm-surface-alt);border:1px solid var(--sm-border)">
+        <h6 class="mb-2"><i class="bi bi-fingerprint me-2" style="color:var(--sm-primary)"></i>Watermark Info</h6>
+        {% if media.watermark_id %}
+        <div class="row g-2">
+          <div class="col-md-6">
+            <small class="text-muted">Watermark ID</small>
+            <div class="font-monospace small">{{ media.watermark_id }}</div>
+          </div>
+          <div class="col-md-6">
+            <small class="text-muted">Payload</small>
+            <div class="font-monospace small">{{ media.watermark_payload }}</div>
+          </div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0 small">No watermark embedded in this file.</p>
+        {% endif %}
+      </div>
+
+      <!-- Actions -->
+      <div class="d-flex gap-2 mt-4">
+        {% if media.status == 'encrypted' %}
+        <a href="{{ url_for('media.download', file_id=media.id) }}" class="btn btn-primary">
+          <i class="bi bi-download me-1"></i>Download &amp; Decrypt
+        </a>
+        <form method="POST" action="{{ url_for('media.delete', file_id=media.id) }}"
+              onsubmit="return confirm('Delete this file permanently? This cannot be undone.');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-outline-danger">
+            <i class="bi bi-trash3 me-1"></i>Delete
+          </button>
+        </form>
+        {% else %}
+        <span class="badge bg-secondary py-2 px-3">File has been deleted</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity log sidebar -->
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-clock-history me-2"></i>File Activity</h6>
+      </div>
+      <div class="card-body p-0">
+        {% if logs %}
+        <div class="table-responsive">
+          <table class="table table-hover mb-0 table-sm">
+            <thead>
+              <tr>
+                <th>Action</th>
+                <th>Result</th>
+                <th>Time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+              <tr>
+                <td>
+                  {% if log.action == 'upload' %}<i class="bi bi-cloud-arrow-up text-primary me-1"></i>
+                  {% elif log.action == 'download' %}<i class="bi bi-download text-success me-1"></i>
+                  {% elif log.action == 'delete' %}<i class="bi bi-trash3 text-danger me-1"></i>
+                  {% else %}<i class="bi bi-gear text-muted me-1"></i>{% endif %}
+                  {{ log.action }}
+                </td>
+                <td>
+                  <span class="badge bg-{{ 'success' if log.result == 'success' else 'danger' }}">
+                    {{ log.result }}
+                  </span>
+                </td>
+                <td>
+                  <span title="{{ log.timestamp.strftime('%Y-%m-%d %H:%M:%S') if log.timestamp else '' }}">
+                    {{ log.timestamp.strftime('%b %d, %H:%M') if log.timestamp else 'N/A' }}
+                  </span>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 text-muted">
+          <p class="mb-0">No activity recorded</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Encryption info card -->
+    <div class="card mt-3">
+      <div class="card-header">
+        <h6 class="mb-0"><i class="bi bi-shield-lock me-2"></i>Security Details</h6>
+      </div>
+      <div class="card-body">
+        <ul class="list-unstyled mb-0 small">
+          <li class="mb-2">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            AES-256-GCM encryption
+          </li>
+          <li class="mb-2">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Fernet key wrapping
+          </li>
+          <li class="mb-2">
+            <i class="bi bi-{{ 'check-circle-fill text-success' if media.watermark_id else 'dash-circle text-muted' }} me-2"></i>
+            Forensic watermark {{ 'embedded' if media.watermark_id else 'not present' }}
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            Policy-controlled access
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

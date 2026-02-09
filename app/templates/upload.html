@@ -1,23 +1,137 @@
 {% extends "base.html" %}
 {% block title %}Upload — SecureMedia{% endblock %}
 
+{% block extra_css %}
+<style>
+  .drop-zone {
+    border: 2px dashed var(--sm-border);
+    border-radius: 12px;
+    padding: 3rem 1.5rem;
+    text-align: center;
+    transition: border-color .2s, background .2s;
+    cursor: pointer;
+  }
+  .drop-zone.dragover {
+    border-color: var(--sm-primary);
+    background: rgba(230,81,0,.08);
+  }
+  .drop-zone .icon { font-size: 3rem; color: var(--sm-text-muted); }
+  .file-preview { display: none; }
+  .file-preview.show { display: flex; }
+  .supported-types span {
+    display: inline-block;
+    background: var(--sm-surface-alt);
+    border: 1px solid var(--sm-border);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: .75rem;
+    margin: 2px;
+    font-family: monospace;
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="row justify-content-center">
-  <div class="col-md-6">
+  <div class="col-md-7 col-lg-6">
+    <div class="text-center mb-4">
+      <i class="bi bi-cloud-arrow-up-fill" style="font-size:3rem;color:var(--sm-primary)"></i>
+      <h3 class="mt-2 fw-bold">Upload &amp; Encrypt</h3>
+      <p class="text-muted">Your file will be watermarked and encrypted with AES-256-GCM</p>
+    </div>
+
     <div class="card p-4">
-      <h3 class="mb-3 text-center">Upload & Encrypt Media</h3>
-      <form method="POST" enctype="multipart/form-data">
-        <div class="mb-3">
-          <label for="file" class="form-label">Select audio or video file</label>
-          <input type="file" class="form-control" id="file" name="file"
+      <form method="POST" enctype="multipart/form-data" data-upload>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <!-- Drag-drop zone -->
+        <div class="drop-zone mb-3" id="dropZone">
+          <i class="bi bi-file-earmark-arrow-up icon"></i>
+          <p class="mt-2 mb-1 fw-semibold">Drag &amp; drop your file here</p>
+          <p class="text-muted small mb-0">or click to browse</p>
+          <input type="file" class="d-none" id="fileInput" name="file"
                  accept=".mp3,.wav,.ogg,.flac,.aac,.mp4,.avi,.mkv,.mov,.webm" required>
-          <div class="form-text">
-            Allowed: mp3, wav, ogg, flac, aac, mp4, avi, mkv, mov, webm — max 500 MB.
-          </div>
         </div>
-        <button type="submit" class="btn btn-primary w-100">🔐 Encrypt & Upload</button>
+
+        <!-- File preview -->
+        <div class="file-preview align-items-center gap-3 p-3 rounded mb-3" id="filePreview"
+             style="background:var(--sm-surface-alt);border:1px solid var(--sm-border)">
+          <i class="bi bi-file-earmark-music fs-2 text-warning" id="previewIcon"></i>
+          <div class="flex-grow-1">
+            <div class="fw-semibold" id="fileName">—</div>
+            <small class="text-muted" id="fileSize">—</small>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger" id="clearFile" title="Remove">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100 py-2" id="submitBtn" disabled>
+          <i class="bi bi-lock-fill me-1"></i>Encrypt &amp; Upload
+        </button>
       </form>
+
+      <hr class="my-3" style="border-color:var(--sm-border)">
+      <div class="supported-types text-center">
+        <small class="text-muted d-block mb-2">Supported formats (max 500 MB):</small>
+        <span>mp3</span><span>wav</span><span>ogg</span><span>flac</span><span>aac</span>
+        <span>mp4</span><span>avi</span><span>mkv</span><span>mov</span><span>webm</span>
+      </div>
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const zone = document.getElementById('dropZone');
+  const input = document.getElementById('fileInput');
+  const preview = document.getElementById('filePreview');
+  const nameEl = document.getElementById('fileName');
+  const sizeEl = document.getElementById('fileSize');
+  const iconEl = document.getElementById('previewIcon');
+  const clearBtn = document.getElementById('clearFile');
+  const submitBtn = document.getElementById('submitBtn');
+
+  zone.addEventListener('click', () => input.click());
+
+  ['dragenter','dragover'].forEach(e => zone.addEventListener(e, ev => {
+    ev.preventDefault(); zone.classList.add('dragover');
+  }));
+  ['dragleave','drop'].forEach(e => zone.addEventListener(e, ev => {
+    ev.preventDefault(); zone.classList.remove('dragover');
+  }));
+
+  zone.addEventListener('drop', ev => {
+    if (ev.dataTransfer.files.length) {
+      input.files = ev.dataTransfer.files;
+      showPreview(ev.dataTransfer.files[0]);
+    }
+  });
+
+  input.addEventListener('change', () => {
+    if (input.files.length) showPreview(input.files[0]);
+  });
+
+  clearBtn.addEventListener('click', () => {
+    input.value = '';
+    preview.classList.remove('show');
+    zone.style.display = '';
+    submitBtn.disabled = true;
+  });
+
+  function showPreview(file) {
+    nameEl.textContent = file.name;
+    sizeEl.textContent = (file.size / 1048576).toFixed(2) + ' MB';
+    const ext = file.name.split('.').pop().toLowerCase();
+    const videoExts = ['mp4','avi','mkv','mov','webm'];
+    iconEl.className = videoExts.includes(ext)
+      ? 'bi bi-film fs-2 text-info'
+      : 'bi bi-file-earmark-music fs-2 text-warning';
+    preview.classList.add('show');
+    zone.style.display = 'none';
+    submitBtn.disabled = false;
+  }
+})();
+</script>
 {% endblock %}

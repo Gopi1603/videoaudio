@@ -7,6 +7,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash,
 from flask_login import login_required, current_user
 
 from app import db
+from app import csrf
 from app.models import User, MediaFile, AuditLog
 from app.kms import (
     KeyRecord, KeyShare, get_key_info, list_keys, revoke_key, 
@@ -311,6 +312,7 @@ def toggle_admin(user_id):
 @admin_bp.route("/api/keys")
 @login_required
 @admin_required
+@csrf.exempt
 def api_list_keys():
     """API: List all keys."""
     status = request.args.get("status")
@@ -321,6 +323,7 @@ def api_list_keys():
 @admin_bp.route("/api/keys/<int:media_id>")
 @login_required
 @admin_required
+@csrf.exempt
 def api_key_detail(media_id):
     """API: Get key details."""
     key_info = get_key_info(media_id)
@@ -332,6 +335,7 @@ def api_key_detail(media_id):
 @admin_bp.route("/api/check-access", methods=["POST"])
 @login_required
 @admin_required
+@csrf.exempt
 def api_check_access():
     """API: Check if a user has access to a file."""
     data = request.get_json()

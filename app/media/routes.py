@@ -1,4 +1,4 @@
-"""Media blueprint — upload, download, dashboard, admin file listing."""
+"""Media blueprint — upload, download, dashboard, profile, file detail, admin file listing."""
 
 import os
 import uuid
@@ -6,16 +6,17 @@ import tempfile
 
 from flask import (
     Blueprint, render_template, redirect, url_for, flash,
-    request, current_app, send_file, abort,
+    request, current_app, send_file, abort, jsonify,
 )
 from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import MediaFile, AuditLog
+from app.models import MediaFile, AuditLog, User
 from app.encryption import encrypt_file, decrypt_file
 from app.watermark import embed_watermark, extract_watermark, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 from app.policy import check_access
+from app import csrf
 
 media_bp = Blueprint("media", __name__)
 
@@ -233,3 +234,189 @@ def admin_files():
         abort(403)
     files = MediaFile.query.order_by(MediaFile.created_at.desc()).all()
     return render_template("admin_files.html", files=files)
+
+
+# -------------------------------------------------------------------------
+# Profile page
+# -------------------------------------------------------------------------
+@media_bp.route("/profile")
+@login_required
+def profile():
+    total_files = MediaFile.query.filter_by(
+        owner_id=current_user.id, status="encrypted"
+    ).count()
+    total_size = db.session.query(
+        db.func.coalesce(db.func.sum(MediaFile.file_size), 0)
+    ).filter_by(owner_id=current_user.id, status="encrypted").scalar()
+    recent_logs = AuditLog.query.filter_by(
+        user_id=current_user.id
+    ).order_by(AuditLog.timestamp.desc()).limit(20).all()
+    return render_template(
+        "profile.html",
+        total_files=total_files,
+        total_size=total_size,
+        recent_logs=recent_logs,
+    )
+
+
+# -------------------------------------------------------------------------
+# File detail page
+# -------------------------------------------------------------------------
+@media_bp.route("/file/<int:file_id>")
+@login_required
+def file_detail(file_id: int):
+    media = db.session.get(MediaFile, file_id)
+    if not media:
+        abort(404)
+    if media.owner_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    # Fetch audit logs for this file
+    logs = AuditLog.query.filter_by(media_id=media.id).order_by(
+        AuditLog.timestamp.desc()
+    ).limit(20).all()
+
+    return render_template("file_detail.html", media=media, logs=logs)
+
+
+# -------------------------------------------------------------------------
+# REST API — JSON endpoints for all user actions
+# -------------------------------------------------------------------------
+@media_bp.route("/api/files")
+@login_required
+@csrf.exempt
+def api_files():
+    """API: list current user's encrypted files."""
+    files = MediaFile.query.filter_by(
+        owner_id=current_user.id, status="encrypted"
+    ).all()
+    return jsonify([
+        {
+            "id": f.id,
+            "filename": f.original_filename,
+            "size": f.file_size,
+            "mime_type": f.mime_type,
+            "watermark_id": f.watermark_id,
+            "created_at": f.created_at.isoformat(),
+        }
+        for f in files
+    ])
+
+
+@media_bp.route("/api/files/<int:file_id>")
+@login_required
+@csrf.exempt
+def api_file_detail(file_id: int):
+    """API: single file detail."""
+    media = db.session.get(MediaFile, file_id)
+    if not media:
+        return jsonify({"error": "File not found"}), 404
+    if media.owner_id != current_user.id and not current_user.is_admin:
+        return jsonify({"error": "Forbidden"}), 403
+    return jsonify({
+        "id": media.id,
+        "filename": media.original_filename,
+        "size": media.file_size,
+        "mime_type": media.mime_type,
+        "status": media.status,
+        "watermark_id": media.watermark_id,
+        "watermark_payload": media.watermark_payload,
+        "created_at": media.created_at.isoformat(),
+    })
+
+
+@media_bp.route("/api/upload", methods=["POST"])
+@login_required
+@csrf.exempt
+def api_upload():
+    """API: upload & encrypt a file (returns JSON)."""
+    f = request.files.get("file")
+    if not f or f.filename == "":
+        return jsonify({"error": "No file selected"}), 400
+    if not _allowed(f.filename):
+        return jsonify({"error": "File type not allowed"}), 400
+
+    original_name = secure_filename(f.filename)
+    ext = original_name.rsplit(".", 1)[1].lower()
+    stored_name = f"{uuid.uuid4().hex}.{ext}.enc"
+    stored_path = os.path.join(current_app.config["UPLOAD_FOLDER"], stored_name)
+
+    import time as _time
+    wm_payload = f"uid:{current_user.id}|ts:{int(_time.time())}"
+
+    tmp_fd, tmp_path = tempfile.mkstemp(suffix=f".{ext}")
+    wm_path = None
+    wm_meta: dict = {}
+    try:
+        f.save(tmp_path)
+        if ext in AUDIO_EXTENSIONS or ext in VIDEO_EXTENSIONS:
+            wm_fd, wm_path = tempfile.mkstemp(suffix=f".{ext}")
+            os.close(wm_fd)
+            try:
+                wm_meta = embed_watermark(tmp_path, wm_path, wm_payload)
+                encrypt_src = wm_path
+            except Exception as wm_err:
+                current_app.logger.warning(f"Watermark skipped: {wm_err}")
+                encrypt_src = tmp_path
+                wm_meta = {"skipped": str(wm_err)}
+        else:
+            encrypt_src = tmp_path
+        wrapped_key, meta = encrypt_file(encrypt_src, stored_path)
+    finally:
+        os.close(tmp_fd)
+        if os.path.exists(tmp_path):
+            os.unlink(tmp_path)
+        if wm_path and os.path.exists(wm_path):
+            os.unlink(wm_path)
+
+    media = MediaFile(
+        owner_id=current_user.id,
+        original_filename=original_name,
+        stored_filename=stored_name,
+        file_size=meta["encrypted_size"],
+        mime_type=f.content_type,
+        encrypted_key=wrapped_key,
+        watermark_payload=wm_payload,
+        watermark_id=wm_meta.get("watermark_id", ""),
+    )
+    db.session.add(media)
+    db.session.commit()
+
+    db.session.add(AuditLog(
+        user_id=current_user.id, action="upload",
+        media_id=media.id, result="success",
+        detail=f"api_upload size={meta['original_size']}",
+    ))
+    db.session.commit()
+
+    return jsonify({
+        "id": media.id,
+        "filename": media.original_filename,
+        "size": media.file_size,
+        "watermark_id": wm_meta.get("watermark_id", ""),
+    }), 201
+
+
+@media_bp.route("/api/files/<int:file_id>", methods=["DELETE"])
+@login_required
+@csrf.exempt
+def api_delete(file_id: int):
+    """API: delete a file."""
+    media = db.session.get(MediaFile, file_id)
+    if not media:
+        return jsonify({"error": "File not found"}), 404
+    if media.owner_id != current_user.id and not current_user.is_admin:
+        return jsonify({"error": "Forbidden"}), 403
+
+    enc_path = os.path.join(current_app.config["UPLOAD_FOLDER"], media.stored_filename)
+    if os.path.isfile(enc_path):
+        os.unlink(enc_path)
+
+    media.status = "deleted"
+    media.encrypted_key = None
+    db.session.add(AuditLog(
+        user_id=current_user.id, action="delete",
+        media_id=media.id, result="success", detail="api_delete",
+    ))
+    db.session.commit()
+    return jsonify({"message": "File deleted"}), 200

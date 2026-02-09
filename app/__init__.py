@@ -1,14 +1,16 @@
 """Application factory – creates and configures the Flask app."""
 
 import os
-from flask import Flask
+from flask import Flask, render_template, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
+from flask_wtf.csrf import CSRFProtect
 
 db = SQLAlchemy()
 login_manager = LoginManager()
 login_manager.login_view = "auth.login"
 login_manager.login_message_category = "info"
+csrf = CSRFProtect()
 
 
 def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
@@ -21,6 +23,7 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
     # Initialise extensions
     db.init_app(app)
     login_manager.init_app(app)
+    csrf.init_app(app)
 
     # Import models so SQLAlchemy knows about them
     from app.models import User, MediaFile, AuditLog  # noqa: F401
@@ -35,6 +38,28 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
     app.register_blueprint(auth_bp)
     app.register_blueprint(media_bp)
     app.register_blueprint(admin_bp)
+
+    # ----- Error handlers -----
+    @app.errorhandler(404)
+    def not_found(e):
+        if request.accept_mimetypes.accept_json and \
+           not request.accept_mimetypes.accept_html:
+            return jsonify({"error": "Not found"}), 404
+        return render_template("errors/404.html"), 404
+
+    @app.errorhandler(403)
+    def forbidden(e):
+        if request.accept_mimetypes.accept_json and \
+           not request.accept_mimetypes.accept_html:
+            return jsonify({"error": "Forbidden"}), 403
+        return render_template("errors/403.html"), 403
+
+    @app.errorhandler(500)
+    def server_error(e):
+        if request.accept_mimetypes.accept_json and \
+           not request.accept_mimetypes.accept_html:
+            return jsonify({"error": "Internal server error"}), 500
+        return render_template("errors/500.html"), 500
 
     # Create tables on first request (dev convenience)
     with app.app_context():

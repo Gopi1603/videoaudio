@@ -2,40 +2,53 @@
 {% block title %}Log In — SecureMedia{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-5">
+<div class="row justify-content-center mt-4">
+  <div class="col-md-5 col-lg-4">
+    <div class="text-center mb-4">
+      <i class="bi bi-shield-lock-fill" style="font-size:3rem;color:var(--sm-primary)"></i>
+      <h3 class="mt-2 fw-bold">Welcome Back</h3>
+      <p class="text-muted">Sign in to access your encrypted media</p>
+    </div>
     <div class="card p-4">
-      <h3 class="mb-3 text-center">Log In</h3>
       <form method="POST" novalidate>
         {{ form.hidden_tag() }}
 
         <div class="mb-3">
-          {{ form.email.label(class="form-label") }}
-          {{ form.email(class="form-control", placeholder="you@example.com") }}
+          <label for="email" class="form-label">
+            <i class="bi bi-envelope me-1"></i>{{ form.email.label.text }}
+          </label>
+          {{ form.email(class="form-control", placeholder="you@example.com", id="email") }}
           {% for e in form.email.errors %}
-            <div class="text-danger small">{{ e }}</div>
+            <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
           {% endfor %}
         </div>
 
         <div class="mb-3">
-          {{ form.password.label(class="form-label") }}
-          {{ form.password(class="form-control") }}
+          <label for="password" class="form-label">
+            <i class="bi bi-lock me-1"></i>{{ form.password.label.text }}
+          </label>
+          {{ form.password(class="form-control", id="password") }}
           {% for e in form.password.errors %}
-            <div class="text-danger small">{{ e }}</div>
+            <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
           {% endfor %}
         </div>
 
         <div class="mb-3 form-check">
-          {{ form.remember(class="form-check-input") }}
-          {{ form.remember.label(class="form-check-label") }}
+          {{ form.remember(class="form-check-input", id="remember") }}
+          <label class="form-check-label" for="remember">Remember me</label>
         </div>
 
-        {{ form.submit(class="btn btn-primary w-100") }}
+        <button type="submit" class="btn btn-primary w-100 py-2">
+          <i class="bi bi-box-arrow-in-right me-1"></i>Sign In
+        </button>
       </form>
-      <p class="text-center mt-3 mb-0">
-        No account? <a href="{{ url_for('auth.register') }}">Register</a>
-      </p>
     </div>
+    <p class="text-center mt-3 text-muted">
+      Don't have an account?
+      <a href="{{ url_for('auth.register') }}" class="text-decoration-none" style="color:var(--sm-primary)">
+        Create one <i class="bi bi-arrow-right"></i>
+      </a>
+    </p>
   </div>
 </div>
 {% endblock %}

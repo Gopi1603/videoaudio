@@ -2,51 +2,69 @@
 {% block title %}Register — SecureMedia{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-md-5">
+<div class="row justify-content-center mt-4">
+  <div class="col-md-5 col-lg-4">
+    <div class="text-center mb-4">
+      <i class="bi bi-person-plus-fill" style="font-size:3rem;color:var(--sm-primary)"></i>
+      <h3 class="mt-2 fw-bold">Create Account</h3>
+      <p class="text-muted">Secure your audio &amp; video files</p>
+    </div>
     <div class="card p-4">
-      <h3 class="mb-3 text-center">Create Account</h3>
       <form method="POST" novalidate>
         {{ form.hidden_tag() }}
 
         <div class="mb-3">
-          {{ form.username.label(class="form-label") }}
-          {{ form.username(class="form-control", placeholder="Choose a username") }}
+          <label for="username" class="form-label">
+            <i class="bi bi-person me-1"></i>{{ form.username.label.text }}
+          </label>
+          {{ form.username(class="form-control", placeholder="Choose a username", id="username") }}
           {% for e in form.username.errors %}
-            <div class="text-danger small">{{ e }}</div>
+            <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
           {% endfor %}
         </div>
 
         <div class="mb-3">
-          {{ form.email.label(class="form-label") }}
-          {{ form.email(class="form-control", placeholder="you@example.com") }}
+          <label for="email" class="form-label">
+            <i class="bi bi-envelope me-1"></i>{{ form.email.label.text }}
+          </label>
+          {{ form.email(class="form-control", placeholder="you@example.com", id="email") }}
           {% for e in form.email.errors %}
-            <div class="text-danger small">{{ e }}</div>
+            <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
           {% endfor %}
         </div>
 
         <div class="mb-3">
-          {{ form.password.label(class="form-label") }}
-          {{ form.password(class="form-control", placeholder="Min 8 characters") }}
+          <label for="password" class="form-label">
+            <i class="bi bi-lock me-1"></i>{{ form.password.label.text }}
+          </label>
+          {{ form.password(class="form-control", placeholder="Min 8 characters", id="password") }}
           {% for e in form.password.errors %}
-            <div class="text-danger small">{{ e }}</div>
+            <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
           {% endfor %}
+          <div class="form-text"><i class="bi bi-info-circle me-1"></i>At least 8 characters</div>
         </div>
 
         <div class="mb-3">
-          {{ form.confirm_password.label(class="form-label") }}
-          {{ form.confirm_password(class="form-control", placeholder="Repeat password") }}
+          <label for="confirm_password" class="form-label">
+            <i class="bi bi-lock-fill me-1"></i>{{ form.confirm_password.label.text }}
+          </label>
+          {{ form.confirm_password(class="form-control", placeholder="Repeat password", id="confirm_password") }}
           {% for e in form.confirm_password.errors %}
-            <div class="text-danger small">{{ e }}</div>
+            <div class="text-danger small mt-1"><i class="bi bi-exclamation-circle me-1"></i>{{ e }}</div>
           {% endfor %}
         </div>
 
-        {{ form.submit(class="btn btn-primary w-100") }}
+        <button type="submit" class="btn btn-primary w-100 py-2">
+          <i class="bi bi-person-plus me-1"></i>Create Account
+        </button>
       </form>
-      <p class="text-center mt-3 mb-0">
-        Already have an account? <a href="{{ url_for('auth.login') }}">Log in</a>
-      </p>
     </div>
+    <p class="text-center mt-3 text-muted">
+      Already have an account?
+      <a href="{{ url_for('auth.login') }}" class="text-decoration-none" style="color:var(--sm-primary)">
+        Sign in <i class="bi bi-arrow-right"></i>
+      </a>
+    </p>
   </div>
 </div>
 {% endblock %}
