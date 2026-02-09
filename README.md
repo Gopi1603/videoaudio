@@ -43,10 +43,56 @@ docker compose exec web flask seed-admin
 
 ### Default Admin Credentials
 ```
-Email:    admin@securemedia.local
-Password: Admin@1234
+Email:    admin
+Password: admin
 ```
 ⚠️ **Change these immediately in production!**
+
+---
+
+## 🐘 PostgreSQL Setup (pgAdmin)
+
+**Note:** For local development, SQLite is already configured and works out of the box. Only follow these steps if you want to use PostgreSQL locally or test a production-like stack.
+
+### 1) Create the database
+- Open pgAdmin → right-click **Databases** → **Create → Database**
+- **Name:** `securemedia`
+- **Owner:** `postgres` (or a new user you create)
+- Click **Save**
+
+### 2) Create a dedicated user (optional but recommended)
+- Expand **Login/Group Roles** → right-click → **Create → Login/Group Role**
+- **General** tab → Name: `securemedia_user`
+- **Definition** tab → Password: `securemedia_pass`
+- **Privileges** tab → Toggle **Can login** to Yes
+- Click **Save**
+
+### 3) Grant privileges
+- Open **Query Tool** (select the `securemedia` DB → Tools → Query Tool) and run:
+
+```sql
+GRANT ALL PRIVILEGES ON DATABASE securemedia TO securemedia_user;
+```
+
+### 4) Update `.env` (or `config.py`)
+Set this before running the app:
+
+```
+DATABASE_URL=postgresql://securemedia_user:securemedia_pass@localhost:5432/securemedia
+```
+
+### 5) Run the app
+The app auto-creates all tables on first run via `db.create_all()`.
+
+#### Auto-created tables
+| Table | Purpose |
+|------|---------|
+| `user` | Users with roles (admin/user) |
+| `media_file` | Uploaded encrypted files |
+| `encryption_key` | AES keys (Fernet-wrapped) |
+| `key_share` | Shamir secret shares |
+| `policy` | RBAC/ABAC access policies |
+| `audit_log` | Activity logs |
 
 ---
 
