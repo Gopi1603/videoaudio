@@ -13,6 +13,7 @@
         <th>Owner</th>
         <th>Filename</th>
         <th>Size</th>
+        <th>Watermark</th>
         <th>Status</th>
         <th>Uploaded</th>
         <th>Actions</th>
@@ -25,6 +26,13 @@
         <td>{{ f.owner.username }}</td>
         <td>{{ f.original_filename }}</td>
         <td>{{ "%.2f"|format(f.file_size / 1048576) }} MB</td>
+        <td>
+          {% if f.watermark_id %}
+            <span class="badge bg-info" title="{{ f.watermark_payload }}">🔏 {{ f.watermark_id[:8] }}…</span>
+          {% else %}
+            <span class="badge bg-secondary">none</span>
+          {% endif %}
+        </td>
         <td>
           <span class="badge {{ 'bg-success' if f.status == 'encrypted' else 'bg-danger' }}">
             {{ f.status }}

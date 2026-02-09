@@ -14,6 +14,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models import MediaFile, AuditLog
 from app.encryption import encrypt_file, decrypt_file
+from app.watermark import embed_watermark, extract_watermark, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 
 media_bp = Blueprint("media", __name__)
 
@@ -54,14 +55,39 @@ def upload():
         stored_name = f"{uuid.uuid4().hex}.{ext}.enc"
         stored_path = os.path.join(current_app.config["UPLOAD_FOLDER"], stored_name)
 
-        # Save temp unencrypted copy, encrypt, then remove temp
+        # Build watermark payload: user ID + timestamp
+        import time as _time
+        wm_payload = f"uid:{current_user.id}|ts:{int(_time.time())}"
+
+        # Save temp unencrypted copy
         tmp_fd, tmp_path = tempfile.mkstemp(suffix=f".{ext}")
+        wm_path = None
+        wm_meta = {}
         try:
             f.save(tmp_path)
-            wrapped_key, meta = encrypt_file(tmp_path, stored_path)
+
+            # --- Phase 3: embed watermark before encryption ---
+            if ext in AUDIO_EXTENSIONS or ext in VIDEO_EXTENSIONS:
+                wm_fd, wm_path = tempfile.mkstemp(suffix=f".{ext}")
+                os.close(wm_fd)
+                try:
+                    wm_meta = embed_watermark(tmp_path, wm_path, wm_payload)
+                    encrypt_src = wm_path      # encrypt the watermarked version
+                except Exception as wm_err:
+                    # If watermarking fails (e.g. file too short), encrypt original
+                    current_app.logger.warning(f"Watermark skipped: {wm_err}")
+                    encrypt_src = tmp_path
+                    wm_meta = {"skipped": str(wm_err)}
+            else:
+                encrypt_src = tmp_path
+
+            wrapped_key, meta = encrypt_file(encrypt_src, stored_path)
         finally:
             os.close(tmp_fd)
-            os.unlink(tmp_path)
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+            if wm_path and os.path.exists(wm_path):
+                os.unlink(wm_path)
 
         media = MediaFile(
             owner_id=current_user.id,
@@ -70,6 +96,8 @@ def upload():
             file_size=meta["encrypted_size"],
             mime_type=f.content_type,
             encrypted_key=wrapped_key,
+            watermark_payload=wm_payload,
+            watermark_id=wm_meta.get("watermark_id", ""),
         )
         db.session.add(media)
         db.session.commit()
@@ -77,11 +105,14 @@ def upload():
         db.session.add(AuditLog(
             user_id=current_user.id, action="upload",
             media_id=media.id, result="success",
-            detail=f"size={meta['original_size']} enc_time={meta['encryption_time_s']}s",
+            detail=(
+                f"size={meta['original_size']} enc_time={meta['encryption_time_s']}s"
+                f" wm_id={wm_meta.get('watermark_id','')} snr={wm_meta.get('snr_db', wm_meta.get('avg_psnr_db','n/a'))}"
+            ),
         ))
         db.session.commit()
 
-        flash(f"'{original_name}' encrypted & stored successfully.", "success")
+        flash(f"'{original_name}' watermarked, encrypted & stored successfully.", "success")
         return redirect(url_for("media.dashboard"))
 
     return render_template("upload.html")
@@ -120,10 +151,28 @@ def download(file_id: int):
         flash("Decryption failed — file may be corrupted.", "danger")
         return redirect(url_for("media.dashboard"))
 
+    # --- Phase 3: verify watermark after decryption ---
+    wm_verify = {}
+    if media.watermark_payload:
+        try:
+            payload_len = len(media.watermark_payload.encode("utf-8"))
+            wm_verify = extract_watermark(tmp_path, payload_len)
+            if wm_verify.get("payload") != media.watermark_payload:
+                wm_verify["match"] = False
+                current_app.logger.warning(
+                    f"Watermark mismatch for file {media.id}: "
+                    f"expected={media.watermark_payload!r} got={wm_verify.get('payload')!r}"
+                )
+            else:
+                wm_verify["match"] = True
+        except Exception as e:
+            wm_verify = {"match": "error", "detail": str(e)}
+            current_app.logger.warning(f"Watermark extraction failed for file {media.id}: {e}")
+
     db.session.add(AuditLog(
         user_id=current_user.id, action="download",
         media_id=media.id, result="success",
-        detail=f"dec_time={meta['decryption_time_s']}s",
+        detail=f"dec_time={meta['decryption_time_s']}s wm_match={wm_verify.get('match', 'n/a')}",
     ))
     db.session.commit()
 

@@ -51,6 +51,10 @@ class MediaFile(db.Model):
     # Encryption metadata (Fernet-wrapped AES key stored as text)
     encrypted_key = db.Column(db.Text, nullable=True)
 
+    # Watermark metadata (Phase 3)
+    watermark_payload = db.Column(db.String(255), nullable=True)  # e.g. "user:3|ts:1707500000"
+    watermark_id = db.Column(db.String(64), nullable=True)        # short hash for display
+
     def __repr__(self) -> str:
         return f"<MediaFile {self.original_filename} ({self.status})>"
 
