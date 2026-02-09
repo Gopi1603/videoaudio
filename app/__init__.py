@@ -23,14 +23,18 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
     login_manager.init_app(app)
 
     # Import models so SQLAlchemy knows about them
-    from app.models import User  # noqa: F401
+    from app.models import User, MediaFile, AuditLog  # noqa: F401
+    from app.kms import KeyRecord, KeyShare  # noqa: F401
+    from app.policy import Policy, PolicyLog  # noqa: F401
 
     # Register blueprints
     from app.auth.routes import auth_bp
     from app.media.routes import media_bp
+    from app.admin.routes import admin_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(media_bp)
+    app.register_blueprint(admin_bp)
 
     # Create tables on first request (dev convenience)
     with app.app_context():

@@ -15,6 +15,7 @@ from app import db
 from app.models import MediaFile, AuditLog
 from app.encryption import encrypt_file, decrypt_file
 from app.watermark import embed_watermark, extract_watermark, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
+from app.policy import check_access
 
 media_bp = Blueprint("media", __name__)
 
@@ -128,14 +129,24 @@ def download(file_id: int):
     if not media or media.status != "encrypted":
         abort(404)
 
-    # Basic ownership check (policy engine comes in Phase 4)
-    if media.owner_id != current_user.id and not current_user.is_admin:
+    # Policy Engine check (Phase 4)
+    allowed, reason = check_access(
+        user_id=current_user.id,
+        user_role=current_user.role,
+        file_id=media.id,
+        file_owner_id=media.owner_id,
+        action="decrypt"
+    )
+    
+    if not allowed:
         db.session.add(AuditLog(
             user_id=current_user.id, action="download",
             media_id=media.id, result="denied",
+            detail=f"Policy denied: {reason}"
         ))
         db.session.commit()
-        abort(403)
+        flash(f"Access denied: {reason}", "danger")
+        return redirect(url_for("media.dashboard"))
 
     enc_path = os.path.join(current_app.config["UPLOAD_FOLDER"], media.stored_filename)
     if not os.path.isfile(enc_path):

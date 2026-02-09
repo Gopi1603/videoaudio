@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block title %}Policy Management - Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-shield-lock me-2"></i>Policy Management</h2>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createPolicyModal">
+            <i class="bi bi-plus-circle me-1"></i>Create Policy
+        </button>
+    </div>
+
+    {% if policies %}
+    <div class="table-responsive">
+        <table class="table table-dark table-hover">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Scope</th>
+                    <th>Type</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for policy in policies %}
+                <tr>
+                    <td>#{{ policy.id }}</td>
+                    <td>
+                        {% if policy.is_global %}
+                        <span class="badge bg-info">Global</span>
+                        {% else %}
+                        File #{{ policy.media_id }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="badge bg-secondary">{{ policy.policy_type }}</span>
+                    </td>
+                    <td>{{ policy.priority }}</td>
+                    <td>
+                        {% if policy.enabled %}
+                        <span class="badge bg-success">Enabled</span>
+                        {% else %}
+                        <span class="badge bg-warning">Disabled</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ policy.created_at.strftime('%Y-%m-%d') if policy.created_at else 'N/A' }}</td>
+                    <td>
+                        <form action="{{ url_for('admin.toggle_policy', policy_id=policy.id) }}" 
+                              method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-warning" title="Toggle">
+                                <i class="bi bi-toggle-{{ 'on' if policy.enabled else 'off' }}"></i>
+                            </button>
+                        </form>
+                        <form action="{{ url_for('admin.delete_policy_route', policy_id=policy.id) }}" 
+                              method="post" class="d-inline"
+                              onsubmit="return confirm('Delete this policy?')">
+                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary">
+        <i class="bi bi-info-circle me-2"></i>No policies defined. Using default owner-only access.
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+        <a href="{{ url_for('admin.key_management') }}" class="btn btn-outline-primary">
+            <i class="bi bi-key me-1"></i>Manage Keys
+        </a>
+        <a href="{{ url_for('admin.audit_logs') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-journal-text me-1"></i>Audit Logs
+        </a>
+    </div>
+</div>
+
+<!-- Create Policy Modal -->
+<div class="modal fade" id="createPolicyModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content bg-dark">
+            <div class="modal-header border-secondary">
+                <h5 class="modal-title">Create New Policy</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('admin.create_policy_route') }}" method="post">
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label for="media_id" class="form-label">File (leave empty for global)</label>
+                            <select class="form-select bg-dark text-light" id="media_id" name="media_id">
+                                <option value="">Global Policy</option>
+                                {% for file in files %}
+                                <option value="{{ file.id }}">#{{ file.id }} - {{ file.original_filename }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label for="policy_type" class="form-label">Policy Type</label>
+                            <select class="form-select bg-dark text-light" id="policy_type" name="policy_type" 
+                                    onchange="togglePolicyOptions(this.value)">
+                                <option value="owner_only">Owner Only</option>
+                                <option value="admin_override">Admin Override</option>
+                                <option value="shared">Shared (specific users)</option>
+                                <option value="time_limited">Time Limited</option>
+                                <option value="multi_party">Multi-Party (threshold)</option>
+                                <option value="custom">Custom Rule</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="priority" class="form-label">Priority (higher = evaluated first)</label>
+                        <input type="number" class="form-control bg-dark text-light" 
+                               id="priority" name="priority" value="0">
+                    </div>
+
+                    <!-- Options for SHARED policy -->
+                    <div id="sharedOptions" class="policy-options d-none">
+                        <div class="mb-3">
+                            <label class="form-label">Allowed Users</label>
+                            {% for user in users %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" 
+                                       name="allowed_users" value="{{ user.id }}" id="user_{{ user.id }}">
+                                <label class="form-check-label" for="user_{{ user.id }}">
+                                    {{ user.username }} ({{ user.email }})
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Options for TIME_LIMITED policy -->
+                    <div id="timeLimitedOptions" class="policy-options d-none">
+                        <div class="mb-3">
+                            <label for="expires_at" class="form-label">Expires At</label>
+                            <input type="datetime-local" class="form-control bg-dark text-light" 
+                                   id="expires_at" name="expires_at">
+                        </div>
+                    </div>
+
+                    <!-- Options for MULTI_PARTY policy -->
+                    <div id="multiPartyOptions" class="policy-options d-none">
+                        <div class="mb-3">
+                            <label for="required_approvals" class="form-label">Required Approvals (threshold)</label>
+                            <input type="number" class="form-control bg-dark text-light" 
+                                   id="required_approvals" name="required_approvals" value="2" min="2">
+                        </div>
+                    </div>
+
+                    <!-- Options for CUSTOM policy -->
+                    <div id="customOptions" class="policy-options d-none">
+                        <div class="mb-3">
+                            <label for="rule_expression" class="form-label">Rule Expression</label>
+                            <textarea class="form-control bg-dark text-light font-monospace" 
+                                      id="rule_expression" name="rule_expression" rows="3"
+                                      placeholder="is_owner or is_admin"></textarea>
+                            <small class="text-muted">
+                                Variables: user_id, user_role, file_id, file_owner_id, action, is_owner, is_admin
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="enabled" name="enabled" checked>
+                        <label class="form-check-label" for="enabled">Enabled</label>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Policy</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function togglePolicyOptions(policyType) {
+    // Hide all options
+    document.querySelectorAll('.policy-options').forEach(el => el.classList.add('d-none'));
+    
+    // Show relevant options
+    if (policyType === 'shared' || policyType === 'time_limited') {
+        document.getElementById('sharedOptions').classList.remove('d-none');
+    }
+    if (policyType === 'time_limited') {
+        document.getElementById('timeLimitedOptions').classList.remove('d-none');
+    }
+    if (policyType === 'multi_party') {
+        document.getElementById('multiPartyOptions').classList.remove('d-none');
+    }
+    if (policyType === 'custom') {
+        document.getElementById('customOptions').classList.remove('d-none');
+    }
+}
+</script>
+{% endblock %}
