@@ -2,7 +2,7 @@
 
 **Project:** Digital Audio & Video Encryption with Watermarking  
 **Date:** 2025-01-25  
-**Total Tests:** 135 (all passing)  
+**Total Tests:** 136 (all passing)  
 **Runtime:** ~36 seconds  
 
 ---
@@ -18,8 +18,8 @@
 | `test_phase5.py` | 27 | ✅ ALL PASS | Profile, REST API, error pages, admin |
 | `test_phase6_encryption.py` | 29 | ✅ ALL PASS | Encryption edge cases & tampering |
 | `test_phase6_watermark.py` | 15 | ✅ ALL PASS | Watermark fidelity & robustness |
-| `test_phase6_integration.py` | 21 | ✅ ALL PASS | E2E, penetration, audit, performance |
-| **TOTAL** | **135** | **✅ 135/135** | |
+| `test_phase6_integration.py` | 22 | ✅ ALL PASS | E2E, penetration, sharing, audit, performance |
+| **TOTAL** | **136** | **✅ 136/136** | |
 
 ---
 
@@ -178,14 +178,14 @@
 | 3 | Audio/video watermarking | 7 + 15 = 22 | ✅ |
 | 4 | Auth routes, upload/download/delete | 8 | ✅ |
 | 5 | UI, REST API, profile, file detail, admin | 27 | ✅ |
-| 6 | Edge cases, tampering, penetration, E2E, performance | 65 | ✅ |
-| **Total** | | **135** | **✅ ALL PASS** |
+| 6 | Edge cases, tampering, penetration, E2E, sharing, performance | 66 | ✅ |
+| **Total** | | **136** | **✅ ALL PASS** |
 
 ---
 
 ## 8. Conclusion
 
-All **135 tests pass** with zero failures. The system demonstrates:
+All **136 tests pass** with zero failures. The system demonstrates:
 
 - **Cryptographic integrity:** AES-256-GCM detects all 7 tampering vectors; encryption throughput exceeds 60 MB/s
 - **Watermark fidelity:** Audio SNR ≥ 15 dB, video PSNR ≥ 26 dB, 100% batch detection

@@ -24,10 +24,16 @@
 
 | Method | Path | Auth | Role | Description |
 |--------|------|------|------|-------------|
-| GET | `/` | Yes | Any | Dashboard — list user's encrypted files. |
+| GET | `/` | Yes | Any | Dashboard — list user's files + shared-with-me files. |
 | GET/POST | `/upload` | Yes | Any | Show upload form / encrypt & store file. |
-| GET | `/download/<file_id>` | Yes | Owner or Admin | Decrypt and stream the file. |
+| GET | `/download/<file_id>` | Yes | Owner, Admin, or Shared | Decrypt and stream the file. |
+| GET | `/download-encrypted/<file_id>` | Yes | Owner, Admin, or Shared | Download raw `.enc` ciphertext. |
 | POST | `/delete/<file_id>` | Yes | Owner or Admin | Soft-delete file (remove from disk, mark deleted). |
+| GET | `/file/<file_id>` | Yes | Owner, Admin, or Shared | View file details + sharing card. |
+| GET | `/verify/<file_id>` | Yes | Owner or Admin | 10-point encryption verification page. |
+| POST | `/share/<file_id>` | Yes | Owner | Share file with selected users via policy engine. |
+| POST | `/revoke/<file_id>/<user_id>` | Yes | Owner | Revoke a user's shared access. |
+| GET | `/profile` | Yes | Any | View user profile. |
 | GET | `/admin/files` | Yes | Admin | List all files in the system. |
 
 ### POST `/upload`

@@ -87,6 +87,9 @@ Integration (1 test)
 - ✅ Access decision logging (`PolicyLog`)
 - ✅ Share management (`share_file()`, `revoke_share()`)
 - ✅ Timezone-aware expiration handling
+- ✅ Wired into media routes: `/share/<file_id>`, `/revoke/<file_id>/<user_id>`
+- ✅ "Shared with Me" dashboard section via policy queries
+- ✅ Contextual file detail actions (owner vs shared user)
 
 ### 3. Admin Dashboard - `app/admin/`
 

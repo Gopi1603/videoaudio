@@ -67,14 +67,17 @@
       </div>
 
       <!-- Actions -->
-      <div class="d-flex gap-2 mt-4">
+      <div class="d-flex gap-2 mt-4 flex-wrap">
         {% if media.status == 'encrypted' %}
+        {% if is_owner or current_user.is_admin %}
         <a href="{{ url_for('media.verify_encryption', file_id=media.id) }}" class="btn btn-outline-success">
           <i class="bi bi-shield-check me-1"></i>Verify Encryption
         </a>
+        {% endif %}
         <a href="{{ url_for('media.download', file_id=media.id) }}" class="btn btn-primary">
           <i class="bi bi-download me-1"></i>Download &amp; Decrypt
         </a>
+        {% if is_owner or current_user.is_admin %}
         <a href="{{ url_for('media.download_encrypted', file_id=media.id) }}" class="btn btn-outline-warning"
            title="Download the raw encrypted ciphertext (won't play — proves encryption)">
           <i class="bi bi-file-earmark-lock me-1"></i>Download Encrypted
@@ -86,6 +89,7 @@
             <i class="bi bi-trash3 me-1"></i>Delete
           </button>
         </form>
+        {% endif %}
         {% else %}
         <span class="badge bg-secondary py-2 px-3">File has been deleted</span>
         {% endif %}
@@ -167,6 +171,74 @@
             Policy-controlled access
           </li>
         </ul>
+      </div>
+    </div>
+
+    <!-- Sharing section -->
+    <div class="card mt-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h6 class="mb-0"><i class="bi bi-people-fill me-2"></i>Sharing</h6>
+        {% if shared_users %}
+        <span class="badge bg-primary">{{ shared_users|length }} user{{ 's' if shared_users|length != 1 }}</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if is_shared_with_me and not is_owner %}
+        <div class="alert alert-info py-2 mb-0 small">
+          <i class="bi bi-info-circle me-1"></i>
+          This file was shared with you by <strong>{{ media.owner.username }}</strong>.
+        </div>
+        {% else %}
+        {# Currently shared with #}
+        {% if shared_users %}
+        <div class="mb-3">
+          <small class="text-muted d-block mb-2">Currently shared with:</small>
+          {% for u in shared_users %}
+          <div class="d-flex align-items-center justify-content-between py-1 px-2 rounded mb-1"
+               style="background:var(--sm-surface-alt)">
+            <span>
+              <i class="bi bi-person-fill me-1 text-info"></i>
+              <strong>{{ u.username }}</strong>
+              <small class="text-muted ms-1">({{ u.email }})</small>
+            </span>
+            <form method="POST" action="{{ url_for('media.revoke', file_id=media.id, user_id=u.id) }}"
+                  class="d-inline" onsubmit="return confirm('Revoke access for {{ u.username }}?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Revoke">
+                <i class="bi bi-x-lg" style="font-size:.7rem"></i>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-muted small mb-3">
+          <i class="bi bi-lock me-1"></i>Not shared — only you can access this file.
+        </p>
+        {% endif %}
+
+        {# Share form #}
+        {% if all_users %}
+        <form method="POST" action="{{ url_for('media.share', file_id=media.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label class="form-label small fw-semibold">Share with users:</label>
+          <select name="user_ids" class="form-select form-select-sm mb-2" multiple size="4"
+                  style="min-height:80px">
+            {% for u in all_users %}
+              {% if u.id not in shared_users|map(attribute='id')|list %}
+              <option value="{{ u.id }}">{{ u.username }} ({{ u.email }})</option>
+              {% endif %}
+            {% endfor %}
+          </select>
+          <small class="text-muted d-block mb-2">Hold Ctrl/Cmd to select multiple users</small>
+          <button type="submit" class="btn btn-sm btn-primary w-100">
+            <i class="bi bi-share me-1"></i>Share File
+          </button>
+        </form>
+        {% elif not all_users %}
+        <small class="text-muted">No other users registered to share with.</small>
+        {% endif %}
+        {% endif %}
       </div>
     </div>
   </div>

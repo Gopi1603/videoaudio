@@ -28,6 +28,12 @@
       <div class="stat-value text-success">{{ files|selectattr('status', 'equalto', 'encrypted')|list|length }}</div>
     </div>
   </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-people me-1"></i>Shared with Me</div>
+      <div class="stat-value text-info">{{ shared_files|default([])|length }}</div>
+    </div>
+  </div>
 </div>
 
 <div class="page-header">
@@ -119,6 +125,67 @@
     <a href="{{ url_for('media.upload') }}" class="btn btn-primary">
       <i class="bi bi-plus-circle me-1"></i>Upload Now
     </a>
+  </div>
+</div>
+{% endif %}
+
+{# ── Shared with me ── #}
+{% if shared_files %}
+<div class="page-header mt-5">
+  <h2><i class="bi bi-people me-2" style="color:var(--sm-primary)"></i>Shared with Me</h2>
+  <span class="badge bg-primary">{{ shared_files|length }} file{{ 's' if shared_files|length != 1 }}</span>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Owner</th>
+          <th>Size</th>
+          <th>Shared</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in shared_files %}
+        <tr>
+          <td>
+            <a href="{{ url_for('media.file_detail', file_id=f.id) }}" class="text-decoration-none text-white">
+              {% if f.mime_type and 'video' in f.mime_type %}
+                <i class="bi bi-film me-2 text-info"></i>
+              {% else %}
+                <i class="bi bi-music-note-beamed me-2 text-warning"></i>
+              {% endif %}
+              <strong>{{ f.original_filename }}</strong>
+            </a>
+          </td>
+          <td>
+            <span class="badge bg-secondary">
+              <i class="bi bi-person me-1"></i>{{ f.owner.username }}
+            </span>
+          </td>
+          <td>{{ "%.2f"|format(f.file_size / 1048576) }} MB</td>
+          <td>
+            <span title="{{ f.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}">
+              {{ f.created_at.strftime('%b %d, %Y') }}
+            </span>
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('media.file_detail', file_id=f.id) }}"
+               class="btn btn-sm btn-outline-secondary me-1" title="Details">
+              <i class="bi bi-info-circle"></i>
+            </a>
+            <a href="{{ url_for('media.download', file_id=f.id) }}"
+               class="btn btn-sm btn-outline-light me-1" title="Download & Decrypt">
+              <i class="bi bi-download"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endif %}

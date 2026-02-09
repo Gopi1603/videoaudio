@@ -67,11 +67,43 @@
 
 ---
 
+## ✅ File Sharing (Code Verified)
+
+- [x] Share file with selected users via policy engine
+- [x] Revoke shared access instantly
+- [x] "Shared with Me" section on dashboard with stat card
+- [x] Shared users can view file detail and download
+- [x] Contextual actions: owner sees all buttons, shared user sees download only
+- [x] Share/revoke events logged to audit trail
+
+---
+
+## ✅ Verify Encryption (Code Verified)
+
+- [x] `/verify/<file_id>` route with 10-point encryption verification
+- [x] Checks: file on disk, magic bytes, Shannon entropy, SHA-256, Fernet key, AES key length, KMS record, watermark, DB status
+- [x] Visual verdict banner (green PASS / red FAIL)
+- [x] Entropy bar and hex preview display
+
+---
+
+## ✅ Download Encrypted (Code Verified)
+
+- [x] `/download-encrypted/<file_id>` serves raw ciphertext
+- [x] Access controlled by policy engine (owner, admin, shared)
+- [x] File delivered as `.enc` with `application/octet-stream`
+
+---
+
 ## ✅ UI Templates (Code Verified)
 
-- [x] Base layout + Bootstrap 5.3 theme
+- [x] Base layout + Bootstrap 5.3 theme + step-by-step upload spinner
 - [x] Auth screens (login/register)
-- [x] Dashboard, upload, file detail, profile
+- [x] Dashboard with file table + "Shared with Me" section + 5 stat cards
+- [x] Upload page with drag-drop zone
+- [x] File detail with sharing card, contextual actions
+- [x] Verify encryption page (10-point checker with verdict banner)
+- [x] Profile page
 - [x] Admin views (keys, policies, users, audit)
 - [x] Public home page with hero section
 

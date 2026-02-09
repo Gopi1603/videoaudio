@@ -87,14 +87,14 @@ videoaudioenc/
 │   ├── models.py            # User, MediaFile, AuditLog models
 │   ├── encryption.py        # AES-256-GCM + Fernet key wrapping
 │   ├── kms.py               # Key Management Service + Shamir SSS
-│   ├── policy.py            # RBAC/ABAC policy engine (6 policy types)
+│   ├── policy.py            # RBAC/ABAC policy engine (6 policy types + sharing)
 │   ├── auth/
 │   │   ├── __init__.py
 │   │   ├── routes.py        # Register, login, logout
 │   │   └── forms.py         # WTForms for auth
 │   ├── media/
 │   │   ├── __init__.py
-│   │   └── routes.py        # Dashboard, upload, download, delete, REST API
+│   │   └── routes.py        # Dashboard, upload, download, share, verify, REST API
 │   ├── admin/
 │   │   ├── __init__.py
 │   │   └── routes.py        # Key/user/policy/audit management
@@ -103,14 +103,15 @@ videoaudioenc/
 │   │   ├── audio.py         # Spread-spectrum audio watermarking
 │   │   └── video.py         # DWT-based video watermarking
 │   └── templates/           # Jinja2 templates (Bootstrap 5.3.3 dark theme)
-│       ├── base.html
-│       ├── dashboard.html
-│       ├── upload.html
-│       ├── profile.html
-│       ├── file_detail.html
-│       ├── auth/
-│       ├── admin/
-│       └── errors/
+│       ├── base.html        # Layout + step-by-step upload spinner
+│       ├── dashboard.html   # Stats + files + shared-with-me section
+│       ├── upload.html      # Drag-drop upload form
+│       ├── profile.html     # User profile
+│       ├── file_detail.html # File info + sharing card + contextual actions
+│       ├── verify_encryption.html  # 10-point encryption verification
+│       ├── auth/            # Login, register
+│       ├── admin/           # Keys, policies, users, audit
+│       └── errors/          # 403, 404, 500 pages
 ├── tests/
 │   ├── test_encryption.py          # Phase 2: Basic crypto (8 tests)
 │   ├── test_kms_policy.py          # Phase 4: KMS + policy (20 tests)
@@ -284,6 +285,8 @@ See `app/kms.py` and `app/policy.py` for full schema definitions.
 ### `app/policy.py`
 - `PolicyType` enum: `OWNER_ONLY`, `ADMIN_OVERRIDE`, `SHARED`, `TIME_LIMITED`, `MULTI_PARTY`, `CUSTOM`
 - `check_access(user_id, user_role, file_id, owner_id)` → `AccessDecision`
+- `share_file(media_id, user_ids, shared_by)` → creates SHARED policies for each user
+- `revoke_share(media_id, user_id)` → removes SHARED policy for user
 - `create_policy(media_id, policy_type, ...)` → Policy
 - `get_file_policies(media_id)` → list
 
@@ -298,7 +301,7 @@ See `app/kms.py` and `app/policy.py` for full schema definitions.
 ## Testing
 
 ```bash
-# Run all 135 tests
+# Run all 136 tests
 python -m pytest tests/ -v --tb=short
 
 # Run with coverage
@@ -321,8 +324,8 @@ python -m pytest tests/test_phase6_integration.py::TestPolicyPenetration -v
 | 5 | `test_phase5.py` | 27 | UI, REST API, admin |
 | 6 | `test_phase6_encryption.py` | 29 | Edge cases, tampering |
 | 6 | `test_phase6_watermark.py` | 15 | Fidelity, robustness |
-| 6 | `test_phase6_integration.py` | 21 | E2E, penetration, audit |
-| **Total** | | **135** | |
+| 6 | `test_phase6_integration.py` | 22 | E2E, penetration, sharing, audit |
+| **Total** | | **136** | |
 
 ---
 
@@ -374,7 +377,7 @@ cp /etc/letsencrypt/live/yourdomain.com/privkey.pem nginx/certs/
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/my-feature`
 3. Write tests for your changes
-4. Ensure all 135+ tests pass: `python -m pytest tests/ -v`
+4. Ensure all 136+ tests pass: `python -m pytest tests/ -v`
 5. Commit with descriptive messages
 6. Push and open a Pull Request
 

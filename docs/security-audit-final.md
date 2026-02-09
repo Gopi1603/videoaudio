@@ -29,13 +29,15 @@
 |---|-------|--------|-------|
 | 2.1 | Admin routes protected by `@admin_required` | ✅ | All `/admin/*` routes decorated |
 | 2.2 | Non-admin redirected with flash message | ✅ | "Admin access required." → dashboard |
-| 2.3 | File download restricted to owner + admin | ✅ | `media.owner_id != current_user.id` check |
+| 2.3 | File download restricted to owner + admin + shared users | ✅ | Policy engine `check_access()` with SHARED policy support |
 | 2.4 | File delete restricted to owner + admin | ✅ | `abort(403)` for unauthorized |
-| 2.5 | File detail restricted to owner + admin | ✅ | `abort(403)` for non-owner/non-admin |
+| 2.5 | File detail accessible to owner + admin + shared users | ✅ | SHARED/TIME_LIMITED policies checked |
 | 2.6 | API endpoints enforce same access rules | ✅ | REST delete returns 403 for non-owner |
-| 2.7 | Policy engine evaluates on every download | ✅ | `check_access()` called in download route |
+| 2.7 | Policy engine evaluates on every download | ✅ | `check_access()` called in download + download-encrypted routes |
 | 2.8 | Unauthenticated users redirected to login | ✅ | All 9 protected routes tested (Phase 6) |
 | 2.9 | 8 penetration test scenarios all blocked | ✅ | Phase 6 `TestPolicyPenetration` (8/8 pass) |
+| 2.10 | File sharing creates proper SHARED policies | ✅ | `share_file()` creates policy per recipient |
+| 2.11 | Share revocation removes access instantly | ✅ | `revoke_share()` deletes SHARED policy |
 
 ---
 
@@ -118,7 +120,7 @@
 
 | # | Check | Status | Notes |
 |---|-------|--------|-------|
-| 8.1 | Total tests: 135 | ✅ | All passing |
+| 8.1 | Total tests: 136 | ✅ | All passing |
 | 8.2 | Unit tests for each module | ✅ | Crypto, watermark, KMS, policy, auth |
 | 8.3 | Integration tests (E2E) | ✅ | Full lifecycle, multi-user, admin |
 | 8.4 | Tampering experiments (7 vectors) | ✅ | All detected by AES-GCM |
@@ -133,13 +135,13 @@
 | Category | Checks | Passed | Status |
 |----------|--------|--------|--------|
 | Authentication & Sessions | 10 | 10 | ✅ |
-| Authorization & Access | 9 | 9 | ✅ |
+| Authorization & Access | 11 | 11 | ✅ |
 | Encryption & Keys | 10 | 10 | ✅ |
 | Input Validation & CSRF | 8 | 8 | ✅ |
 | Watermarking | 6 | 6 | ✅ |
 | Transport & Infrastructure | 10 | 10 | ✅ |
 | Audit & Compliance | 6 | 6 | ✅ |
 | Testing Coverage | 7 | 7 | ✅ |
-| **TOTAL** | **66** | **66** | **✅ ALL PASS** |
+| **TOTAL** | **68** | **68** | **✅ ALL PASS** |
 
-**Conclusion:** The application meets all security requirements defined in the PRD. All 66 security checks pass. The system is ready for production deployment.
+**Conclusion:** The application meets all security requirements defined in the PRD. All 68 security checks pass. The system is ready for production deployment.

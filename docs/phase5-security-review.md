@@ -39,7 +39,17 @@
 | Proper HTTP status codes | ✅ | 200, 201, 400, 403, 404 |
 | JSON error responses | ✅ | Structured `{"error": "..."}` format |
 | CSRF exempt for API | ✅ | `@csrf.exempt` on API routes only |
-| Owner-only file access | ✅ | Checks `media.owner_id == current_user.id` |
+| Owner-only file access | ✅ | Policy engine `check_access()` with SHARED support |
+
+## Sharing Security
+
+| Check | Status | Notes |
+|---|---|---|
+| Share restricted to file owner | ✅ | Route checks `media.owner_id == current_user.id` |
+| Revoke restricted to file owner | ✅ | Route checks ownership before revoking |
+| Shared users can view/download only | ✅ | Cannot delete, re-share, or modify |
+| Share/revoke events audited | ✅ | AuditLog entries for all share actions |
+| Policy engine enforces sharing | ✅ | `check_access()` checks SHARED policies |
 
 ## Recommendations for Production
 

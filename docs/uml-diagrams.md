@@ -19,6 +19,10 @@ flowchart LR
   uc_decrypt[Decrypt Media]
   uc_verify[Verify Watermark]
   uc_profile[View Profile]
+  uc_share[Share File]
+  uc_revoke[Revoke Share]
+  uc_verify_enc[Verify Encryption]
+  uc_download_enc[Download Encrypted]
   uc_audit[View Audit Logs]
   uc_keys[Manage Keys]
   uc_policies[Manage Policies]
@@ -30,6 +34,10 @@ flowchart LR
   user --> uc_download
   user --> uc_profile
   user --> uc_verify
+  user --> uc_share
+  user --> uc_revoke
+  user --> uc_verify_enc
+  user --> uc_download_enc
 
   admin --> uc_audit
   admin --> uc_keys
@@ -38,6 +46,7 @@ flowchart LR
 
   uc_upload --> uc_watermark --> uc_encrypt
   uc_download --> uc_decrypt --> uc_verify
+  uc_share --> uc_revoke
 ```
 
 ---
@@ -144,6 +153,21 @@ classDiagram
 
   class PolicyEngine {
     +evaluate_policy(context)
+    +share_file(media_id, user_ids, shared_by)
+    +revoke_share(media_id, user_id)
+    +check_access(user_id, role, file_id, owner_id)
+  }
+
+  class VerifyEngine {
+    +check_file_exists(path)
+    +check_magic_bytes(path)
+    +calculate_entropy(path)
+    +compute_sha256(path)
+    +verify_fernet_key(key)
+    +verify_aes_key_length(key)
+    +check_kms_record(media_id)
+    +check_watermark(media)
+    +check_db_status(media)
   }
 
   User "1" --> "*" MediaFile : owns
@@ -219,7 +243,94 @@ sequenceDiagram
 
 ---
 
-## 5) Activity Diagram (End-to-End Upload Flow)
+## 5) Sequence Diagram (Share File → Policy → Recipient Access)
+
+```mermaid
+sequenceDiagram
+  participant O as Owner
+  participant UI as Web UI
+  participant M as Media Routes
+  participant P as Policy Engine
+  participant DB as Database
+  participant R as Recipient
+
+  O->>UI: Select users to share with
+  UI->>M: POST /share/<file_id>
+  M->>P: share_file(media_id, user_ids, owner_id)
+  P->>DB: Create SHARED policies for each user
+  DB-->>P: OK
+  P-->>M: success
+  M->>DB: Write AuditLog (share event)
+  M-->>UI: Flash "File shared successfully"
+
+  R->>UI: View Dashboard
+  UI->>M: GET /
+  M->>DB: Query SHARED policies for recipient
+  DB-->>M: List of shared files
+  M-->>UI: Show "Shared with Me" section
+
+  R->>UI: Click Download on shared file
+  UI->>M: GET /download/<file_id>
+  M->>P: check_access(recipient, file)
+  P-->>M: ALLOW (shared policy)
+  M-->>UI: Stream decrypted file
+```
+
+---
+
+## 6) Sequence Diagram (Verify Encryption)
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant UI as Web UI
+  participant M as Media Routes
+  participant FS as File Store
+  participant E as Encryption
+  participant K as KMS
+  participant DB as Database
+
+  U->>UI: Click "Verify Encryption"
+  UI->>M: GET /verify/<file_id>
+  M->>FS: Check file exists on disk
+  M->>FS: Read first 64 bytes (magic bytes check)
+  M->>FS: Calculate Shannon entropy
+  M->>FS: Compute SHA-256 hash
+  M->>E: Unwrap Fernet key test
+  M->>E: Check AES key length (32 bytes)
+  M->>K: Check KMS record exists
+  M->>DB: Check watermark info
+  M->>DB: Check file status
+  M-->>UI: Render verification results (10 checks)
+```
+
+---
+
+## 7) Sequence Diagram (Download Encrypted File)
+
+```mermaid
+sequenceDiagram
+  participant U as User
+  participant UI as Web UI
+  participant M as Media Routes
+  participant P as Policy Engine
+  participant FS as File Store
+
+  U->>UI: Click "Download Encrypted"
+  UI->>M: GET /download-encrypted/<file_id>
+  M->>P: check_access(user, file)
+  P-->>M: ALLOW/DENY
+  alt ALLOW
+    M->>FS: Read raw .enc ciphertext
+    M-->>UI: Send file as application/octet-stream
+  else DENY
+    M-->>UI: 403 Forbidden
+  end
+```
+
+---
+
+## 8) Activity Diagram (End-to-End Upload Flow)
 
 ```mermaid
 flowchart TD

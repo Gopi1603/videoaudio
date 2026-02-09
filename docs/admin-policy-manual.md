@@ -21,6 +21,10 @@ Admins have elevated privileges to manage the entire SecureMedia platform:
 | Upload / download own files | ✅ | ✅ |
 | View own file details | ✅ | ✅ |
 | Delete own files | ✅ | ✅ |
+| Share files with other users | ✅ | ✅ (own files) |
+| Revoke shared access | ✅ | ✅ (own files) |
+| Verify file encryption | ✅ | ✅ (own files) |
+| Download encrypted (raw) | ✅ | ✅ (own/shared) |
 | View/download ANY user's files | ✅ | ❌ |
 | Manage users (promote/demote) | ✅ | ❌ |
 | View/revoke encryption keys | ✅ | ❌ |
@@ -87,6 +91,57 @@ Shows ALL files in the system regardless of owner, including:
 - Download any file (bypasses owner-only policy)
 - Delete any file
 - Revoke encryption keys
+
+---
+
+## File Sharing (User Feature)
+
+### How Sharing Works
+File owners can share their encrypted files with other registered users directly from the file detail page.
+
+**Sharing flow:**
+1. Owner navigates to `/file/<id>`
+2. In the **Sharing** card, selects users from the multi-select dropdown
+3. Clicks **Share File** → POST `/share/<file_id>`
+4. Policy engine creates `SHARED` policies for each recipient
+5. Recipients see the file in their **"Shared with Me"** dashboard section
+
+**Revoke flow:**
+1. Owner navigates to `/file/<id>`
+2. In the **Currently Shared With** list, clicks **Revoke** next to a user
+3. POST `/revoke/<file_id>/<user_id>` deletes the SHARED policy
+4. Access is removed instantly
+
+**What shared users can do:**
+- View the file detail page (with info banner: "This file was shared with you by [owner]")
+- Download the decrypted file
+- Download the encrypted (raw) file
+- They **cannot** delete, re-share, or modify the file
+
+**Audit:** All share and revoke actions are logged with user IDs and timestamps.
+
+---
+
+## Encryption Verification
+
+### Route: `/verify/<file_id>`
+
+The Verify Encryption page provides a **10-point check** proving a file is truly encrypted:
+
+| Check | What It Verifies |
+|-------|------------------|
+| File on disk | The `.enc` file exists in storage |
+| Magic bytes | File doesn't match known plaintext formats |
+| Shannon entropy | High entropy indicates encryption (>7.5 for 8-bit data) |
+| SHA-256 hash | Cryptographic fingerprint of the ciphertext |
+| Fernet key unwrap | The wrapped key can be decrypted with the master key |
+| AES key length | Unwrapped key is exactly 32 bytes (AES-256) |
+| KMS record | Key Management System has a record for this file |
+| Watermark info | Watermark metadata exists in database |
+| DB status | File status is "encrypted" in database |
+| Overall verdict | PASS if ≥8 of 10 checks succeed |
+
+The page shows a visual **verdict banner** (green PASS / red FAIL), an **entropy bar**, and a **hex preview** of the first 64 bytes.
 
 ---
 
@@ -189,7 +244,9 @@ All significant actions are logged to the `audit_logs` table:
 | `key_rotate` | Admin rotates a key | Media ID, admin username |
 | `policy_create` | New policy created | Policy ID, type |
 | `policy_update` | Policy modified | Policy ID, changes |
-| `share` | File shared with user | Media ID, target user |
+| `share` | File shared with user | Media ID, target user IDs |
+| `revoke_share` | Shared access revoked | Media ID, target user ID |
+| `verify_encryption` | Encryption verified | Media ID, check results |
 
 ### Audit Log Fields
 - **user_id**: Who performed the action

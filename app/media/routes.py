@@ -17,7 +17,7 @@ from app.models import MediaFile, AuditLog, User
 from app.encryption import encrypt_file, decrypt_file, unwrap_key
 from app.kms import store_key
 from app.watermark import embed_watermark, extract_watermark, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
-from app.policy import check_access
+from app.policy import check_access, share_file, revoke_share, Policy, PolicyType
 from app import csrf
 
 media_bp = Blueprint("media", __name__)
@@ -36,7 +36,25 @@ def dashboard():
     if not current_user.is_authenticated:
         return render_template("home.html")
     files = MediaFile.query.filter_by(owner_id=current_user.id, status="encrypted").all()
-    return render_template("dashboard.html", files=files)
+
+    # Fetch files shared with the current user via policies
+    shared_policies = Policy.query.filter(
+        Policy.policy_type.in_([PolicyType.SHARED.value, PolicyType.TIME_LIMITED.value]),
+        Policy.enabled == True,
+    ).all()
+    shared_file_ids = set()
+    for p in shared_policies:
+        if current_user.id in p.get_allowed_users():
+            if p.media_id:
+                shared_file_ids.add(p.media_id)
+    # Exclude own files, only include active encrypted files
+    shared_files = MediaFile.query.filter(
+        MediaFile.id.in_(shared_file_ids),
+        MediaFile.owner_id != current_user.id,
+        MediaFile.status == "encrypted",
+    ).all() if shared_file_ids else []
+
+    return render_template("dashboard.html", files=files, shared_files=shared_files)
 
 
 # -------------------------------------------------------------------------
@@ -217,8 +235,17 @@ def download_encrypted(file_id: int):
     if not media or media.status != "encrypted":
         abort(404)
 
-    if media.owner_id != current_user.id and not current_user.is_admin:
-        abort(403)
+    # Policy Engine check — same as decrypt download
+    allowed, reason = check_access(
+        user_id=current_user.id,
+        user_role=current_user.role,
+        file_id=media.id,
+        file_owner_id=media.owner_id,
+        action="decrypt"
+    )
+    if not allowed:
+        flash(f"Access denied: {reason}", "danger")
+        return redirect(url_for("media.dashboard"))
 
     enc_path = os.path.join(current_app.config["UPLOAD_FOLDER"], media.stored_filename)
     if not os.path.isfile(enc_path):
@@ -316,7 +343,21 @@ def file_detail(file_id: int):
     media = db.session.get(MediaFile, file_id)
     if not media:
         abort(404)
-    if media.owner_id != current_user.id and not current_user.is_admin:
+
+    # Allow owner, admin, or users the file is shared with
+    is_owner = media.owner_id == current_user.id
+    is_admin = current_user.is_admin
+    shared_policies = Policy.query.filter(
+        Policy.media_id == media.id,
+        Policy.policy_type.in_([PolicyType.SHARED.value, PolicyType.TIME_LIMITED.value]),
+        Policy.enabled == True
+    ).all()
+    shared_user_ids = set()
+    for p in shared_policies:
+        shared_user_ids.update(p.get_allowed_users())
+    is_shared_with_me = current_user.id in shared_user_ids
+
+    if not is_owner and not is_admin and not is_shared_with_me:
         abort(403)
 
     # Fetch audit logs for this file
@@ -324,7 +365,84 @@ def file_detail(file_id: int):
         AuditLog.timestamp.desc()
     ).limit(20).all()
 
-    return render_template("file_detail.html", media=media, logs=logs)
+    # For owner/admin: get users list for sharing UI
+    all_users = []
+    if is_owner or is_admin:
+        all_users = User.query.filter(User.id != media.owner_id).order_by(User.username).all()
+
+    # Get users currently shared with (resolve IDs to objects)
+    shared_users = User.query.filter(User.id.in_(shared_user_ids)).all() if shared_user_ids else []
+
+    return render_template(
+        "file_detail.html", media=media, logs=logs,
+        all_users=all_users, shared_users=shared_users,
+        is_owner=is_owner, is_shared_with_me=is_shared_with_me,
+    )
+
+
+# -------------------------------------------------------------------------
+# Share file with users
+# -------------------------------------------------------------------------
+@media_bp.route("/share/<int:file_id>", methods=["POST"])
+@login_required
+def share(file_id: int):
+    media = db.session.get(MediaFile, file_id)
+    if not media:
+        abort(404)
+    if media.owner_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    user_ids = request.form.getlist("user_ids", type=int)
+    if not user_ids:
+        flash("Select at least one user to share with.", "warning")
+        return redirect(url_for("media.file_detail", file_id=media.id))
+
+    # Validate user IDs exist and aren't the owner
+    valid_ids = [
+        u.id for u in User.query.filter(User.id.in_(user_ids)).all()
+        if u.id != media.owner_id
+    ]
+
+    if valid_ids:
+        share_file(media.id, current_user.id, valid_ids)
+        usernames = [u.username for u in User.query.filter(User.id.in_(valid_ids)).all()]
+        db.session.add(AuditLog(
+            user_id=current_user.id, action="share",
+            media_id=media.id, result="success",
+            detail=f"Shared with: {', '.join(usernames)}",
+        ))
+        db.session.commit()
+        flash(f"File shared with {', '.join(usernames)}.", "success")
+    else:
+        flash("No valid users selected.", "warning")
+
+    return redirect(url_for("media.file_detail", file_id=media.id))
+
+
+# -------------------------------------------------------------------------
+# Revoke share for a user
+# -------------------------------------------------------------------------
+@media_bp.route("/revoke/<int:file_id>/<int:user_id>", methods=["POST"])
+@login_required
+def revoke(file_id: int, user_id: int):
+    media = db.session.get(MediaFile, file_id)
+    if not media:
+        abort(404)
+    if media.owner_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    target_user = db.session.get(User, user_id)
+    revoke_share(media.id, user_id)
+
+    db.session.add(AuditLog(
+        user_id=current_user.id, action="revoke_share",
+        media_id=media.id, result="success",
+        detail=f"Revoked access for: {target_user.username if target_user else user_id}",
+    ))
+    db.session.commit()
+
+    flash(f"Access revoked for {target_user.username if target_user else 'user'}.", "info")
+    return redirect(url_for("media.file_detail", file_id=media.id))
 
 
 # -------------------------------------------------------------------------

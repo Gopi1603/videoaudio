@@ -2,7 +2,7 @@
 
 [![CI/CD](https://github.com/Gopi1603/videoaudio/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Gopi1603/videoaudio/actions)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://python.org)
-[![Tests](https://img.shields.io/badge/tests-135%20passed-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/tests-136%20passed-brightgreen.svg)](#testing)
 
 A production-ready Flask web application for **encrypting**, **forensic watermarking**, and **policy-controlled access management** of audio and video files. Built for educational content protection with FERPA-compliant audit logging.
 
@@ -16,8 +16,11 @@ A production-ready Flask web application for **encrypting**, **forensic watermar
 | 🏷️ **Watermarking** | Spread-spectrum + DWT | Imperceptible forensic watermarks for audio & video |
 | 🔑 **Key Management** | Shamir's Secret Sharing | Split keys into shares, threshold reconstruction |
 | 🛡️ **Access Control** | RBAC + ABAC | 6 policy types: owner-only, shared, time-limited, multi-party |
+| 🤝 **File Sharing** | Policy-based sharing | Share files with specific users, revoke access anytime |
+| ✅ **Verify Encryption** | 10-point checker | Prove files are encrypted: entropy, magic bytes, SHA-256, KMS |
+| 📥 **Download Encrypted** | Raw ciphertext export | Download the raw `.enc` file for offline storage or transfer |
 | 📋 **Audit Trail** | Full event logging | Every action logged for FERPA compliance |
-| 🎨 **Modern UI** | Bootstrap 5.3 dark theme | Responsive dashboard, drag-drop upload, admin panel |
+| 🎨 **Modern UI** | Bootstrap 5.3 dark theme | Responsive dashboard, drag-drop upload, step-by-step spinner |
 | 🐳 **Containerized** | Docker + Nginx + PostgreSQL | Production-ready deployment stack |
 | 🚀 **CI/CD** | GitHub Actions | Automated lint → test → build → deploy pipeline |
 
@@ -113,14 +116,26 @@ The app auto-creates all tables on first run via `db.create_all()`.
 ## 📸 Screenshots
 
 ### Dashboard
-- Dark theme with stats cards (total files, storage, watermarked, encrypted)
+- Dark theme with stats cards (total files, storage, watermarked, encrypted, shared with me)
 - File table with download, detail, and delete actions
+- **Shared with Me** section showing files shared by other users
 - Responsive Bootstrap 5.3.3 layout
 
 ### Upload
 - Drag-and-drop upload zone
 - Supports: MP3, WAV, OGG, FLAC, AAC, MP4, AVI, MKV, MOV, WEBM
-- Real-time encryption progress spinner
+- Step-by-step upload spinner (Preparing → Watermark → AES-256-GCM → Fernet → KMS → Uploading → Done)
+
+### File Detail
+- Full file metadata, encryption info, watermark info, audit log
+- **Sharing card**: share with users, view current shares, revoke access
+- Contextual actions: owner sees all buttons, shared users see download only
+- Info banner for shared files: "This file was shared with you by [owner]"
+
+### Verify Encryption
+- 10-point verification page proving a file is truly encrypted
+- Checks: file on disk, magic bytes, Shannon entropy, SHA-256 hash, Fernet key, AES key length, KMS record, watermark, DB status
+- Visual verdict banner (green PASS / red FAIL), entropy bar, hex preview
 
 ### Admin Panel
 - User management (promote/demote admin)
@@ -146,13 +161,21 @@ Client → Nginx (HTTPS/TLS) → Gunicorn (WSGI) → Flask App
          Encryption   Watermarking    KMS     Policy Engine
          AES-256-GCM  Spread-Spec   Shamir    RBAC+ABAC
          + Fernet     + DWT Video    SSS      6 policies
-              │            │             │          │
+              │            │             │      + Sharing
               └────────────┼─────────────┘          │
                            │                         │
-                    ┌──────┴──────┐                  │
-                    │             │                   │
-               SQLite/PgSQL   File Storage      Audit Logs
+              ┌────────────┼──────────────┐          │
+              │            │              │          │
+         SQLite/PgSQL  File Storage  Audit Logs  Verify Engine
 ```
+
+### Key User Flows
+- **Upload**: Select file → Watermark → Encrypt AES-256-GCM → Wrap key → Store → Audit
+- **Download (Decrypt)**: Policy check → Unwrap key → Decrypt → Verify watermark → Stream
+- **Download Encrypted**: Policy check → Serve raw `.enc` ciphertext as-is
+- **Verify Encryption**: 10-point check (file, entropy, hash, key, KMS, watermark, DB)
+- **Share**: Owner selects users → Policy engine creates SHARED policies → Recipients see file
+- **Revoke**: Owner removes user → Policy deleted → Access removed instantly
 
 ---
 
@@ -178,20 +201,20 @@ Client → Nginx (HTTPS/TLS) → Gunicorn (WSGI) → Flask App
 
 ## 🧪 Testing
 
-**135 tests** covering all modules — run in ~36 seconds:
+**136 tests** covering all modules — run in ~36 seconds:
 
 ```bash
 python -m pytest tests/ -v --tb=short
 ```
 
 | Test Suite | Tests | Coverage |
-|-----------|-------|---------|
+|-----------|-------|--------|
 | Encryption (basic + edge cases + tampering) | 37 | AES-GCM, Fernet, 7 tamper vectors |
 | Watermarking (fidelity + robustness + batch) | 22 | SNR, PSNR, noise, resample |
 | KMS & Policy (Shamir + RBAC + ABAC) | 20 | Key lifecycle, 6 policy types |
 | Routes & Auth | 8 | Register, login, upload, download |
 | UI, REST API, Admin | 27 | Profile, file detail, error pages |
-| E2E Integration & Penetration | 21 | Lifecycle, 8 attack scenarios, audit |
+| E2E Integration & Penetration | 22 | Lifecycle, 8 attack scenarios, sharing, audit |
 
 ### Performance Benchmarks
 | Metric | Value |
@@ -209,17 +232,26 @@ python -m pytest tests/ -v --tb=short
 
 ```
 ├── app/
-│   ├── __init__.py          # App factory + extensions
+│   ├── __init__.py          # App factory + extensions + admin auto-create
 │   ├── models.py            # User, MediaFile, AuditLog
 │   ├── encryption.py        # AES-256-GCM + Fernet
 │   ├── kms.py               # Key Management + Shamir SSS
-│   ├── policy.py            # RBAC/ABAC policy engine
+│   ├── policy.py            # RBAC/ABAC policy engine + sharing
 │   ├── auth/                # Authentication blueprint
-│   ├── media/               # Media operations blueprint
+│   ├── media/               # Media: dashboard, upload, download, share, verify
 │   ├── admin/               # Admin management blueprint
 │   ├── watermark/           # Audio + video watermarking
-│   └── templates/           # Jinja2 templates
-├── tests/                   # 135 pytest tests
+│   └── templates/
+│       ├── base.html        # Layout + step-by-step upload spinner
+│       ├── dashboard.html   # Stats + files + shared-with-me section
+│       ├── upload.html      # Drag-drop upload form
+│       ├── file_detail.html # File info + sharing card + actions
+│       ├── verify_encryption.html  # 10-point encryption verifier
+│       ├── profile.html     # User profile page
+│       ├── auth/            # Login, register templates
+│       ├── admin/           # Keys, policies, users, audit templates
+│       └── errors/          # 403, 404, 500 error pages
+├── tests/                   # 136 pytest tests
 ├── docs/                    # Full documentation set
 ├── nginx/                   # Reverse proxy config
 ├── .github/workflows/       # CI/CD pipeline
@@ -266,7 +298,7 @@ docker compose up -d           # Starts Flask + PostgreSQL + Nginx
 ### CI/CD Pipeline
 Automated via GitHub Actions:
 1. **Lint** → flake8 code quality
-2. **Test** → 135 tests with coverage report
+2. **Test** → 136 tests with coverage report
 3. **Build** → Docker image
 4. **Push** → Docker Hub (on version tags)
 5. **Deploy** → SSH to production server (on version tags)

@@ -33,5 +33,13 @@
 - **Testing**: pytest
 
 ## Open Questions
-- RBAC framework: custom vs Oso/Casbin.
-- Key splitting library for Shamir’s Secret Sharing.
+- ~~RBAC framework: custom vs Oso/Casbin.~~ → **Resolved:** Custom RBAC+ABAC policy engine with 6 policy types + file sharing
+- ~~Key splitting library for Shamir's Secret Sharing.~~ → **Resolved:** Custom GF(257) implementation in `app/kms.py`
+
+## Additional Features (Added Post-Planning)
+- **Policy-Based File Sharing**: Share/revoke files with other users via SHARED policies
+- **Encryption Verification**: 10-point checker (entropy, magic bytes, SHA-256, KMS, Fernet, AES key)
+- **Download Encrypted**: Serve raw AES-GCM ciphertext for offline storage/forensic analysis
+- **Step-by-Step Upload Spinner**: Animated progress through pipeline stages
+- **Admin Auto-Create**: Default admin account created on app startup
+- **136 Automated Tests**: Full coverage across all modules

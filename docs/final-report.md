@@ -49,11 +49,11 @@ within selected frequency components.
 ## Architecture Overview
 **Core modules:**
 - **Auth Module:** registration/login, session handling, role checks
-- **Media Module:** upload, download, file detail, and dashboard
+- **Media Module:** upload, download, file detail, dashboard, sharing, verify encryption
 - **Encryption Module:** AES‑GCM + Fernet wrapping (`app/encryption.py`)
 - **Watermarking Module:** audio (spread‑spectrum), video (DWT) (`app/watermark/`)
-- **KMS Module:** key storage, Shamir’s Secret Sharing (`app/kms.py`)
-- **Policy Engine:** RBAC + ABAC rules (`app/policy.py`)
+- **KMS Module:** key storage, Shamir's Secret Sharing (`app/kms.py`)
+- **Policy Engine:** RBAC + ABAC rules, file sharing (`app/policy.py`)
 - **Admin Module:** users, policies, key management, audit logs
 
 A full UML set is available in [docs/uml-diagrams.md](docs/uml-diagrams.md).
@@ -85,12 +85,31 @@ preserving audio and video quality.
 3. Encrypt with AES‑GCM
 4. Wrap key with Fernet
 5. Persist metadata + audit log
+6. Step-by-step spinner UI: Preparing → Watermark → AES-256-GCM → Fernet → KMS → Uploading → Done
 
 ### 2) Download Pipeline
-1. Verify access via policy engine
+1. Verify access via policy engine (owner, admin, or shared user)
 2. Decrypt file using Fernet‑unwrapped AES key
 3. Optionally extract watermark to verify payload
 4. Record audit log
+
+### 3) Policy-Based File Sharing
+1. File owner selects users to share with
+2. Policy engine creates SHARED policies for each recipient
+3. Shared users see file in "Shared with Me" dashboard section
+4. Shared users can download (decrypted) or download encrypted
+5. Owner can revoke access at any time, instantly removing the policy
+6. All share/revoke actions logged to audit trail
+
+### 4) Verify Encryption Page
+1. 10-point verification proving a file is truly encrypted
+2. Checks: file on disk, magic bytes, Shannon entropy, SHA-256 hash, Fernet key unwrap, AES key length, KMS record, watermark, DB status
+3. Visual verdict banner (green PASS / red FAIL) with entropy bar and hex preview
+
+### 5) Download Encrypted File
+1. Serves raw AES-GCM ciphertext as `application/octet-stream`
+2. File delivered with `.enc` extension for offline storage or forensic analysis
+3. Access controlled by policy engine (owner, admin, or shared user)
 
 ---
 
@@ -135,11 +154,16 @@ preserving audio and video quality.
 ---
 
 ## Deliverables
-- ✅ Source code and full test suite
+- ✅ Source code and full test suite (136 tests)
 - ✅ Deployment stack (Docker + Nginx + PostgreSQL)
 - ✅ Documentation (API, admin, developer guide)
 - ✅ UML diagrams (class, sequence, activity, use case)
 - ✅ Final security audit checklist
+- ✅ Policy-based file sharing (share/revoke with audit trail)
+- ✅ Encryption verification page (10-point checker)
+- ✅ Encrypted file download (raw ciphertext export)
+- ✅ Step-by-step upload spinner with pipeline progress
+- ✅ "Shared with Me" dashboard section
 
 ---
 ## System Requirements

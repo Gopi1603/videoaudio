@@ -59,10 +59,10 @@ End the current session.
 ## Media Endpoints (Web)
 
 ### GET `/`
-Dashboard — list current user's encrypted files.
+Dashboard — list current user's encrypted files and files shared with them.
 
 **Auth:** Required  
-**Response:** `200` HTML with file table, stats cards.
+**Response:** `200` HTML with file table, stats cards (total, storage, watermarked, encrypted, shared with me), and "Shared with Me" section.
 
 ---
 
@@ -98,7 +98,7 @@ Upload and encrypt a media file.
 ### GET `/download/<file_id>`
 Decrypt and download a file.
 
-**Auth:** Required (owner or admin)
+**Auth:** Required (owner, admin, or shared user via policy engine)
 
 **Processing Pipeline:**
 1. Check ownership / admin role
@@ -133,13 +133,106 @@ Soft-delete a file.
 ### GET `/file/<file_id>`
 View file details page.
 
-**Auth:** Required (owner or admin)
+**Auth:** Required (owner, admin, or shared user)
 
 **Response:** `200` HTML with:
 - File metadata (name, size, date, MIME type)
 - Encryption info (AES-256-GCM, key status)
 - Watermark info (payload, watermark ID)
 - Audit log history for this file
+- **Sharing card** (owner only): current shares, share form with user multi-select, revoke buttons
+- **Contextual actions**: owner sees all buttons; shared users see Download & Download Encrypted only
+- **Info banner**: shared users see "This file was shared with you by [owner]"
+
+---
+
+### POST `/share/<file_id>`
+Share a file with one or more users via the policy engine.
+
+**Auth:** Required (file owner only)
+
+| Field | Type | Required |
+|-------|------|----------|
+| `user_ids` | list[integer] | ✅ |
+
+**Processing:**
+1. Validate current user is file owner
+2. Create SHARED policies for each selected user via `share_file()`
+3. Log share event to audit trail
+
+**Responses:**
+- `302` → Redirect to `/file/<file_id>` with success flash
+- `403` → Not the file owner
+- `404` → File not found
+
+**Audit:** Creates `share` audit log with shared user IDs.
+
+---
+
+### POST `/revoke/<file_id>/<user_id>`
+Revoke a user's shared access to a file.
+
+**Auth:** Required (file owner only)
+
+**Processing:**
+1. Validate current user is file owner
+2. Remove SHARED policy for the specified user via `revoke_share()`
+3. Log revoke event to audit trail
+
+**Responses:**
+- `302` → Redirect to `/file/<file_id>` with success flash
+- `403` → Not the file owner
+- `404` → File not found
+
+**Audit:** Creates `revoke_share` audit log.
+
+---
+
+### GET `/verify/<file_id>`
+Verify that a file is truly encrypted with a 10-point check.
+
+**Auth:** Required (owner or admin)
+
+**Verification Checks:**
+1. File exists on disk
+2. Magic bytes analysis (not a known plaintext format)
+3. Shannon entropy calculation (high entropy = encrypted)
+4. SHA-256 hash of ciphertext
+5. Fernet key unwrap test
+6. AES key length verification (32 bytes = AES-256)
+7. KMS record exists
+8. Watermark info present
+9. Database status check
+10. Overall verdict (PASS if ≥8 checks pass)
+
+**Response:** `200` HTML with:
+- Verdict banner (green PASS / red FAIL)
+- Individual check results with icons
+- Entropy bar visualization
+- Hex preview of first 64 bytes
+- SHA-256 hash display
+
+---
+
+### GET `/download-encrypted/<file_id>`
+Download the raw encrypted ciphertext without decryption.
+
+**Auth:** Required (owner, admin, or shared user via policy engine)
+
+**Processing:**
+1. Check access via `check_access()` policy engine
+2. Read raw `.enc` file from disk
+3. Serve as `application/octet-stream` with `.enc` extension
+
+**Responses:**
+- `200` → Raw ciphertext file download
+- `403` → Not authorized (policy denied)
+- `404` → File not found
+
+**Use Cases:**
+- Offline backup of encrypted data
+- Forensic analysis of ciphertext
+- Transfer encrypted files to another system
 
 ---
 
