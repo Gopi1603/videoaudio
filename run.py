@@ -12,11 +12,11 @@ def seed_admin():
     if User.query.filter_by(role="admin").first():
         print("Admin already exists.")
         return
-    admin = User(username="admin", email="admin@securemedia.local", role="admin")
-    admin.set_password("Admin@1234")
+    admin = User(username="admin", email="admin", role="admin")
+    admin.set_password("admin")
     db.session.add(admin)
     db.session.commit()
-    print("Admin created  ➜  admin@securemedia.local / Admin@1234")
+    print("Admin created  ➜  admin / admin")
 
 
 if __name__ == "__main__":

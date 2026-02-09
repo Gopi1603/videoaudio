@@ -298,7 +298,14 @@ def toggle_admin(user_id):
         return redirect(url_for("admin.user_management"))
     
     user = User.query.get_or_404(user_id)
-    user.role = "user" if user.role == "admin" else "admin"
+    if user.role != "admin":
+        existing_admin = User.query.filter_by(role="admin").first()
+        if existing_admin:
+            flash("Only one admin is allowed.", "warning")
+            return redirect(url_for("admin.user_management"))
+        user.role = "admin"
+    else:
+        user.role = "user"
     db.session.commit()
     
     flash(f"User {user.username} is now {'an admin' if user.is_admin else 'a regular user'}.", "success")
