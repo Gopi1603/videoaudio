@@ -4,6 +4,7 @@
 {% block body_class %}home-hero{% endblock %}
 {% block brand_label %}Nickel{% endblock %}
 {% block main_class %}p-0{% endblock %}
+{% set show_nav = false %}
 
 {% block extra_css %}
 .home-hero .navbar {
@@ -53,20 +54,20 @@
 
 {% block content %}
 <section class="hero-section" id="products">
-  <img src="/hero-bg2.png" alt="SecureMedia hero background" class="hero-bg" />
+    <img src="/static/hero-bg2.png" alt="SecureMedia hero background" class="hero-bg" />
   <div class="hero-overlay"></div>
   <div class="container hero-content">
-    <div class="row align-items-center">
-      <div class="col-lg-6 offset-lg-6 text-lg-end">
-        <p class="text-uppercase text-warning fw-semibold small mb-2">Dark Mode SaaS</p>
+    <div class="row align-items-center justify-content-end">
+      <div class="col-12 col-lg-6 text-end">
+        <p class="text-uppercase text-warning fw-semibold small mb-2">Secure Media Platform</p>
         <h1 class="display-5 fw-bold text-white">Secure Every Frame. Protect Every Sound.</h1>
         <p class="fs-6 text-muted">
           Encrypt videos and audio files in real time, control access, prevent leaks, and ensure
           complete privacy across devices and platforms.
         </p>
-        <div class="d-flex flex-wrap gap-2 justify-content-lg-end mt-4">
+        <div class="d-flex flex-wrap gap-2 justify-content-end mt-4">
           <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Get Started</a>
-          <a class="btn btn-outline-light" href="#company">See How It Works</a>
+          <a class="btn btn-outline-light" href="{{ url_for('auth.login') }}">Log In</a>
         </div>
       </div>
     </div>

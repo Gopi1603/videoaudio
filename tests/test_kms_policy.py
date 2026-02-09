@@ -39,13 +39,20 @@ def client(app):
 def setup_users(app):
     """Create test users."""
     with app.app_context():
-        admin = User(username="admin", email="admin@test.com", role="admin")
-        admin.set_password("adminpass")
+        # Admin may already exist from auto-create in create_app()
+        admin = User.query.filter_by(username="admin").first()
+        if not admin:
+            admin = User(username="admin", email="admin@test.com", role="admin")
+            admin.set_password("adminpass")
+            db.session.add(admin)
+        else:
+            admin.email = "admin@test.com"
+            admin.set_password("adminpass")
         user1 = User(username="user1", email="user1@test.com", role="user")
         user1.set_password("user1pass")
         user2 = User(username="user2", email="user2@test.com", role="user")
         user2.set_password("user2pass")
-        db.session.add_all([admin, user1, user2])
+        db.session.add_all([user1, user2])
         db.session.commit()
         return {"admin": admin.id, "user1": user1.id, "user2": user2.id}
 

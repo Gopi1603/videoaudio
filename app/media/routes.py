@@ -1,7 +1,8 @@
-"""Media blueprint — upload, download, dashboard, profile, file detail, admin file listing."""
+"""Media blueprint — upload, download, dashboard, profile, file detail, verify encryption, admin file listing."""
 
 import os
 import uuid
+import hashlib
 import tempfile
 
 from flask import (
@@ -13,7 +14,8 @@ from werkzeug.utils import secure_filename
 
 from app import db
 from app.models import MediaFile, AuditLog, User
-from app.encryption import encrypt_file, decrypt_file
+from app.encryption import encrypt_file, decrypt_file, unwrap_key
+from app.kms import store_key
 from app.watermark import embed_watermark, extract_watermark, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
 from app.policy import check_access
 from app import csrf
@@ -104,6 +106,15 @@ def upload():
         )
         db.session.add(media)
         db.session.commit()
+
+        # Create KMS record (so Admin → Key Management is populated)
+        try:
+            raw_key = unwrap_key(wrapped_key)
+            record = store_key(media.id, raw_key)
+            media.encrypted_key = record.encrypted_key
+            db.session.commit()
+        except Exception as kms_err:
+            current_app.logger.warning(f"KMS record not created: {kms_err}")
 
         db.session.add(AuditLog(
             user_id=current_user.id, action="upload",
@@ -197,6 +208,42 @@ def download(file_id: int):
 
 
 # -------------------------------------------------------------------------
+# Download encrypted (raw) — serves the ciphertext as-is
+# -------------------------------------------------------------------------
+@media_bp.route("/download-encrypted/<int:file_id>")
+@login_required
+def download_encrypted(file_id: int):
+    media = db.session.get(MediaFile, file_id)
+    if not media or media.status != "encrypted":
+        abort(404)
+
+    if media.owner_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    enc_path = os.path.join(current_app.config["UPLOAD_FOLDER"], media.stored_filename)
+    if not os.path.isfile(enc_path):
+        abort(404)
+
+    # Serve the raw encrypted file with .enc extension so it's clearly ciphertext
+    name_parts = media.original_filename.rsplit(".", 1)
+    enc_name = f"{name_parts[0]}_encrypted.{name_parts[1]}.enc" if len(name_parts) == 2 else f"{media.original_filename}.enc"
+
+    db.session.add(AuditLog(
+        user_id=current_user.id, action="download_encrypted",
+        media_id=media.id, result="success",
+        detail="Raw encrypted file downloaded (ciphertext)",
+    ))
+    db.session.commit()
+
+    return send_file(
+        enc_path,
+        as_attachment=True,
+        download_name=enc_name,
+        mimetype="application/octet-stream",
+    )
+
+
+# -------------------------------------------------------------------------
 # Delete
 # -------------------------------------------------------------------------
 @media_bp.route("/delete/<int:file_id>", methods=["POST"])
@@ -278,6 +325,128 @@ def file_detail(file_id: int):
     ).limit(20).all()
 
     return render_template("file_detail.html", media=media, logs=logs)
+
+
+# -------------------------------------------------------------------------
+# Verify Encryption — prove stored file is really encrypted
+# -------------------------------------------------------------------------
+@media_bp.route("/verify/<int:file_id>")
+@login_required
+def verify_encryption(file_id: int):
+    media = db.session.get(MediaFile, file_id)
+    if not media:
+        abort(404)
+    if media.owner_id != current_user.id and not current_user.is_admin:
+        abort(403)
+
+    from app.kms import KeyRecord
+
+    checks = {}
+
+    # 1. File on disk
+    enc_path = os.path.join(current_app.config["UPLOAD_FOLDER"], media.stored_filename)
+    file_exists = os.path.isfile(enc_path)
+    checks["file_on_disk"] = file_exists
+
+    if file_exists:
+        # 2. Read raw header — AES-GCM output starts with 12-byte nonce (random)
+        with open(enc_path, "rb") as fh:
+            raw_header = fh.read(64)
+            fh.seek(0, 2)
+            raw_size = fh.tell()
+
+        checks["stored_filename"] = media.stored_filename
+        checks["stored_size_bytes"] = raw_size
+        checks["raw_hex_header"] = raw_header[:32].hex()
+
+        # 3. Check if file is playable (valid media headers)
+        # Known magic bytes for media formats
+        magic_sigs = {
+            b'\x49\x44\x33': 'MP3 (ID3)',
+            b'\xff\xfb': 'MP3',
+            b'\xff\xf3': 'MP3',
+            b'\x52\x49\x46\x46': 'WAV/AVI (RIFF)',
+            b'\x4f\x67\x67\x53': 'OGG',
+            b'\x66\x4c\x61\x43': 'FLAC',
+            b'\x00\x00\x00': 'MP4/MOV (possible)',
+            b'\x1a\x45\xdf\xa3': 'MKV/WebM',
+        }
+        detected_format = None
+        for sig, fmt in magic_sigs.items():
+            if raw_header[:len(sig)] == sig:
+                detected_format = fmt
+                break
+
+        checks["raw_file_playable"] = detected_format is not None
+        checks["detected_format"] = detected_format  # None = not recognisable = encrypted ✓
+
+        # 4. Shannon entropy of first 1024 bytes (encrypted data ≈ 7.9+ bits/byte)
+        with open(enc_path, "rb") as fh:
+            sample = fh.read(1024)
+        if sample:
+            import math
+            freq = [0] * 256
+            for b in sample:
+                freq[b] += 1
+            entropy = 0.0
+            for count in freq:
+                if count > 0:
+                    p = count / len(sample)
+                    entropy -= p * math.log2(p)
+            checks["entropy_bits_per_byte"] = round(entropy, 3)
+            checks["entropy_verdict"] = (
+                "high (encrypted)" if entropy > 7.5 else "medium" if entropy > 6.0 else "low (likely unencrypted)"
+            )
+
+        # 5. SHA-256 hash of stored (encrypted) file
+        sha = hashlib.sha256()
+        with open(enc_path, "rb") as fh:
+            while True:
+                chunk = fh.read(65536)
+                if not chunk:
+                    break
+                sha.update(chunk)
+        checks["sha256_encrypted"] = sha.hexdigest()
+
+    # 6. Encryption key present?
+    checks["encrypted_key_present"] = bool(media.encrypted_key)
+    if media.encrypted_key:
+        checks["key_token_preview"] = media.encrypted_key[:20] + "…" + media.encrypted_key[-8:]
+
+    # 7. KMS record exists?
+    kms_record = KeyRecord.query.filter_by(media_id=media.id).first()
+    checks["kms_record_exists"] = kms_record is not None
+    if kms_record:
+        checks["kms_status"] = kms_record.status
+        checks["kms_total_shares"] = kms_record.total_shares
+        checks["kms_threshold"] = kms_record.threshold
+        checks["kms_shares_count"] = kms_record.shares.count()
+
+    # 8. Watermark info
+    checks["watermark_embedded"] = bool(media.watermark_id)
+    checks["watermark_payload"] = media.watermark_payload or "—"
+    checks["watermark_id"] = media.watermark_id or "—"
+
+    # 9. Can we actually decrypt? (quick test — unwrap key only, don't decrypt full file)
+    try:
+        raw_key = unwrap_key(media.encrypted_key)
+        checks["fernet_unwrap"] = True
+        checks["aes_key_length_bits"] = len(raw_key) * 8
+    except Exception as e:
+        checks["fernet_unwrap"] = False
+        checks["fernet_error"] = str(e)
+
+    # 10. Status
+    checks["db_status"] = media.status
+
+    # Log the verification
+    db.session.add(AuditLog(
+        user_id=current_user.id, action="verify",
+        media_id=media.id, result="success",
+    ))
+    db.session.commit()
+
+    return render_template("verify_encryption.html", media=media, checks=checks)
 
 
 # -------------------------------------------------------------------------

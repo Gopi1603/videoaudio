@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+{% block title %}Verify Encryption — {{ media.original_filename }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .verify-card {
+    background: var(--sm-surface);
+    border: 1px solid var(--sm-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+  .verify-card h6 { margin-bottom: 1rem; font-weight: 700; }
+  .check-row {
+    display: flex;
+    align-items: center;
+    padding: .6rem 0;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+  }
+  .check-row:last-child { border-bottom: none; }
+  .check-icon { width: 32px; text-align: center; font-size: 1.1rem; flex-shrink: 0; }
+  .check-label { flex: 1; font-weight: 500; }
+  .check-value { text-align: right; font-family: 'Cascadia Code', 'Fira Code', monospace; font-size: .85rem; color: var(--sm-text-muted); max-width: 50%; word-break: break-all; }
+  .verdict-banner {
+    border-radius: 12px;
+    padding: 1.5rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  .verdict-pass {
+    background: linear-gradient(135deg, rgba(0,200,83,.12), rgba(0,200,83,.04));
+    border: 1px solid rgba(0,200,83,.3);
+  }
+  .verdict-fail {
+    background: linear-gradient(135deg, rgba(255,23,68,.12), rgba(255,23,68,.04));
+    border: 1px solid rgba(255,23,68,.3);
+  }
+  .hex-preview {
+    background: var(--sm-surface-alt);
+    border: 1px solid var(--sm-border);
+    border-radius: 8px;
+    padding: .75rem 1rem;
+    font-family: 'Cascadia Code', 'Fira Code', monospace;
+    font-size: .8rem;
+    word-break: break-all;
+    color: var(--sm-primary);
+    margin-top: .5rem;
+  }
+  .entropy-bar {
+    height: 8px;
+    border-radius: 4px;
+    background: var(--sm-surface-alt);
+    overflow: hidden;
+    margin-top: .4rem;
+  }
+  .entropy-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width .6s ease;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('media.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('media.file_detail', file_id=media.id) }}">{{ media.original_filename }}</a></li>
+    <li class="breadcrumb-item active">Verify Encryption</li>
+  </ol>
+</nav>
+
+{# ── Overall verdict ── #}
+{% set all_pass = checks.file_on_disk and not checks.raw_file_playable and checks.encrypted_key_present and checks.kms_record_exists and checks.fernet_unwrap and (checks.entropy_bits_per_byte|default(0) > 7.5) %}
+
+<div class="verdict-banner {{ 'verdict-pass' if all_pass else 'verdict-fail' }}">
+  {% if all_pass %}
+    <i class="bi bi-shield-fill-check" style="font-size:2.5rem;color:var(--sm-success)"></i>
+    <h4 class="mt-2 mb-1 fw-bold" style="color:var(--sm-success)">Encryption Verified ✓</h4>
+    <p class="text-muted mb-0">This file is fully encrypted, watermarked, and key-managed.</p>
+  {% else %}
+    <i class="bi bi-shield-fill-exclamation" style="font-size:2.5rem;color:var(--sm-danger)"></i>
+    <h4 class="mt-2 mb-1 fw-bold" style="color:var(--sm-danger)">Verification Issues Found</h4>
+    <p class="text-muted mb-0">One or more encryption checks did not pass — see details below.</p>
+  {% endif %}
+</div>
+
+<div class="row g-4">
+  {# ── LEFT COLUMN ── #}
+  <div class="col-lg-7">
+
+    {# ─ 1. File Storage ─ #}
+    <div class="verify-card">
+      <h6><i class="bi bi-hdd-fill me-2" style="color:var(--sm-primary)"></i>File Storage</h6>
+
+      <div class="check-row">
+        <div class="check-icon">
+          {% if checks.file_on_disk %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+        </div>
+        <div class="check-label">Encrypted file exists on disk</div>
+        <div class="check-value">{{ 'Yes' if checks.file_on_disk else 'No — missing!' }}</div>
+      </div>
+
+      {% if checks.file_on_disk %}
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-file-earmark-lock text-info"></i></div>
+        <div class="check-label">Stored filename</div>
+        <div class="check-value">{{ checks.stored_filename }}</div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-arrows-angle-expand text-info"></i></div>
+        <div class="check-label">Encrypted file size</div>
+        <div class="check-value">{{ "{:,}".format(checks.stored_size_bytes) }} bytes ({{ "%.2f"|format(checks.stored_size_bytes / 1048576) }} MB)</div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-icon">
+          {% if not checks.raw_file_playable %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% else %}<i class="bi bi-exclamation-triangle-fill text-warning"></i>{% endif %}
+        </div>
+        <div class="check-label">Raw file playable as media?</div>
+        <div class="check-value">
+          {% if not checks.raw_file_playable %}
+            <span class="text-success">No (encrypted) ✓</span>
+          {% else %}
+            <span class="text-warning">Detected: {{ checks.detected_format }}</span>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if checks.raw_hex_header %}
+      <div class="mt-3">
+        <small class="text-muted">Raw encrypted bytes (first 32):</small>
+        <div class="hex-preview">{{ checks.raw_hex_header }}</div>
+        <small class="text-muted mt-1 d-block">Random-looking bytes = AES-GCM nonce + ciphertext (not a valid media header)</small>
+      </div>
+      {% endif %}
+    </div>
+
+    {# ─ 2. Entropy Analysis ─ #}
+    {% if checks.entropy_bits_per_byte is defined %}
+    <div class="verify-card">
+      <h6><i class="bi bi-bar-chart-fill me-2" style="color:var(--sm-primary)"></i>Entropy Analysis</h6>
+
+      <div class="check-row">
+        <div class="check-icon">
+          {% if checks.entropy_bits_per_byte > 7.5 %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% else %}<i class="bi bi-exclamation-triangle-fill text-warning"></i>{% endif %}
+        </div>
+        <div class="check-label">Shannon entropy</div>
+        <div class="check-value">{{ checks.entropy_bits_per_byte }} bits/byte</div>
+      </div>
+
+      <div class="entropy-bar mt-2">
+        <div class="entropy-fill" style="width: {{ (checks.entropy_bits_per_byte / 8 * 100)|round }}%;
+          background: {% if checks.entropy_bits_per_byte > 7.5 %}var(--sm-success){% elif checks.entropy_bits_per_byte > 6 %}#ff9800{% else %}var(--sm-danger){% endif %};"></div>
+      </div>
+      <div class="d-flex justify-content-between mt-1">
+        <small class="text-muted">0 (ordered)</small>
+        <small class="fw-semibold" style="color: {% if checks.entropy_bits_per_byte > 7.5 %}var(--sm-success){% elif checks.entropy_bits_per_byte > 6 %}#ff9800{% else %}var(--sm-danger){% endif %}">
+          {{ checks.entropy_verdict }}
+        </small>
+        <small class="text-muted">8 (random)</small>
+      </div>
+      <small class="text-muted d-block mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        Properly encrypted data has near-maximum entropy (≈ 7.9–8.0 bits/byte). Unencrypted media typically shows 5–7 bits/byte.
+      </small>
+    </div>
+    {% endif %}
+
+    {# ─ 3. File Integrity ─ #}
+    {% if checks.sha256_encrypted %}
+    <div class="verify-card">
+      <h6><i class="bi bi-fingerprint me-2" style="color:var(--sm-primary)"></i>File Integrity</h6>
+
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-hash text-info"></i></div>
+        <div class="check-label">SHA-256 (encrypted file)</div>
+        <div class="check-value" style="font-size:.75rem">{{ checks.sha256_encrypted }}</div>
+      </div>
+
+      <small class="text-muted d-block mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        This hash uniquely identifies the encrypted file. Any tampering changes the hash.
+      </small>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── RIGHT COLUMN ── #}
+  <div class="col-lg-5">
+
+    {# ─ 4. Encryption Key ─ #}
+    <div class="verify-card">
+      <h6><i class="bi bi-key-fill me-2" style="color:var(--sm-primary)"></i>Encryption Key</h6>
+
+      <div class="check-row">
+        <div class="check-icon">
+          {% if checks.encrypted_key_present %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+        </div>
+        <div class="check-label">Fernet-wrapped key stored</div>
+        <div class="check-value">{{ 'Yes' if checks.encrypted_key_present else 'No!' }}</div>
+      </div>
+
+      {% if checks.key_token_preview %}
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-eye-slash text-info"></i></div>
+        <div class="check-label">Key token (preview)</div>
+        <div class="check-value" style="font-size:.75rem">{{ checks.key_token_preview }}</div>
+      </div>
+      {% endif %}
+
+      <div class="check-row">
+        <div class="check-icon">
+          {% if checks.fernet_unwrap %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+        </div>
+        <div class="check-label">Fernet unwrap test</div>
+        <div class="check-value">{{ 'Pass ✓' if checks.fernet_unwrap else 'Failed: ' + checks.get('fernet_error', '') }}</div>
+      </div>
+
+      {% if checks.aes_key_length_bits %}
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-shield-lock text-info"></i></div>
+        <div class="check-label">AES key length</div>
+        <div class="check-value">{{ checks.aes_key_length_bits }}-bit</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {# ─ 5. KMS (Key Management) ─ #}
+    <div class="verify-card">
+      <h6><i class="bi bi-safe2-fill me-2" style="color:var(--sm-primary)"></i>Key Management (KMS)</h6>
+
+      <div class="check-row">
+        <div class="check-icon">
+          {% if checks.kms_record_exists %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}
+        </div>
+        <div class="check-label">KMS record exists</div>
+        <div class="check-value">{{ 'Yes' if checks.kms_record_exists else 'No' }}</div>
+      </div>
+
+      {% if checks.kms_record_exists %}
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-diagram-3 text-info"></i></div>
+        <div class="check-label">Shamir shares</div>
+        <div class="check-value">{{ checks.kms_shares_count }} of {{ checks.kms_total_shares }} (threshold: {{ checks.kms_threshold }})</div>
+      </div>
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-circle-fill text-{{ 'success' if checks.kms_status == 'active' else 'danger' }}"></i></div>
+        <div class="check-label">KMS status</div>
+        <div class="check-value text-{{ 'success' if checks.kms_status == 'active' else 'danger' }}">{{ checks.kms_status }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {# ─ 6. Watermark ─ #}
+    <div class="verify-card">
+      <h6><i class="bi bi-water me-2" style="color:var(--sm-primary)"></i>Forensic Watermark</h6>
+
+      <div class="check-row">
+        <div class="check-icon">
+          {% if checks.watermark_embedded %}<i class="bi bi-check-circle-fill text-success"></i>
+          {% else %}<i class="bi bi-dash-circle text-muted"></i>{% endif %}
+        </div>
+        <div class="check-label">Watermark embedded</div>
+        <div class="check-value">{{ 'Yes' if checks.watermark_embedded else 'No' }}</div>
+      </div>
+
+      {% if checks.watermark_embedded %}
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-qr-code text-info"></i></div>
+        <div class="check-label">Watermark ID</div>
+        <div class="check-value">{{ checks.watermark_id }}</div>
+      </div>
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-braces text-info"></i></div>
+        <div class="check-label">Payload</div>
+        <div class="check-value">{{ checks.watermark_payload }}</div>
+      </div>
+      {% endif %}
+    </div>
+
+    {# ─ 7. DB Status ─ #}
+    <div class="verify-card">
+      <h6><i class="bi bi-database-fill me-2" style="color:var(--sm-primary)"></i>Database Record</h6>
+
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-lock-fill text-{{ 'success' if checks.db_status == 'encrypted' else 'danger' }}"></i></div>
+        <div class="check-label">Status</div>
+        <div class="check-value">
+          <span class="badge bg-{{ 'success' if checks.db_status == 'encrypted' else 'danger' }}">{{ checks.db_status }}</span>
+        </div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-file-earmark text-info"></i></div>
+        <div class="check-label">Original filename</div>
+        <div class="check-value">{{ media.original_filename }}</div>
+      </div>
+
+      <div class="check-row">
+        <div class="check-icon"><i class="bi bi-calendar3 text-info"></i></div>
+        <div class="check-label">Uploaded</div>
+        <div class="check-value">{{ media.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</div>
+      </div>
+    </div>
+
+    {# ─ Actions ─ #}
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('media.file_detail', file_id=media.id) }}" class="btn btn-outline-secondary flex-fill">
+        <i class="bi bi-arrow-left me-1"></i>Back to File
+      </a>
+      <a href="{{ url_for('media.download_encrypted', file_id=media.id) }}" class="btn btn-outline-warning flex-fill"
+         title="Download the raw ciphertext (won't play — proves encryption)">
+        <i class="bi bi-file-earmark-lock me-1"></i>Download Encrypted
+      </a>
+      <a href="{{ url_for('media.download', file_id=media.id) }}" class="btn btn-primary flex-fill">
+        <i class="bi bi-download me-1"></i>Download &amp; Decrypt
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

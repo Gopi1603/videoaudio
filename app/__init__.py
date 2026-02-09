@@ -15,6 +15,13 @@ csrf = CSRFProtect()
 
 
 def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
+    # Load environment variables from .env if present
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+    except Exception:
+        pass
+
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config.from_object(config_name)
 
@@ -65,6 +72,18 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
     # Create tables on first request (dev convenience)
     with app.app_context():
         db.create_all()
+        try:
+            from app.models import User
+            admin_email = os.environ.get("ADMIN_EMAIL", "admin")
+            admin_password = os.environ.get("ADMIN_PASSWORD", "admin")
+            if not User.query.filter_by(role="admin").first():
+                admin = User(username="admin", email=admin_email, role="admin")
+                admin.set_password(admin_password)
+                db.session.add(admin)
+                db.session.commit()
+                app.logger.info("Default admin created")
+        except Exception as e:
+            app.logger.warning(f"Admin auto-create skipped: {e}")
 
     # ----- Health check endpoint (used by Docker / load balancers) -----
     @app.route("/health")

@@ -1,10 +1,21 @@
 # Final Report — SecureMedia
 
 **Project:** Digital Audio & Video Encryption with Watermarking Scheme (Flask Web App)  
-**Date:** 2026-02-09  
-**Status:** Complete (All phases delivered, tests passing)
 
 ---
+## Introduction
+In recent years, the storage and sharing of digital audio and video
+content have increased significantly, especially in educational
+institutions. Storing such sensitive multimedia data in third-party
+storage systems raises concerns regarding privacy, unauthorized
+access, data tampering, and ownership protection.
+
+To address these issues, this project proposes a Digital Audio &
+Video Encryption with Watermarking Scheme that combines
+cryptographic encryption techniques with forensic watermarking.
+The system ensures confidentiality, integrity, and traceability of
+audio and video content.
+
 
 ## Executive Summary
 SecureMedia is a production-ready Flask application that protects audio and video files using AES‑256‑GCM encryption, Fernet key wrapping, and forensic watermarking. It delivers secure upload, controlled access, and audit‑ready download flows, with a full admin panel for keys, policies, and users. The system enforces RBAC + ABAC policies, logs all critical actions, and supports Docker‑based deployment with CI/CD.
@@ -20,6 +31,20 @@ SecureMedia is a production-ready Flask application that protects audio and vide
 - Production‑ready deployment stack and documentation
 
 ---
+## Existing System
+In existing systems, Discrete Fourier Transform (DFT) and
+Signal-to-Error Ratio (SER) based techniques are commonly used
+for audio and video watermarking. These methods transform
+signals into the frequency domain and embed watermark data
+within selected frequency components.
+
+### Limitations
+- Vulnerable to signal processing and compression attacks
+- Loss of information during transformations
+- Limited watermark capacity
+- No integrated encryption or access control
+
+
 
 ## Architecture Overview
 **Core modules:**
@@ -34,6 +59,14 @@ SecureMedia is a production-ready Flask application that protects audio and vide
 A full UML set is available in [docs/uml-diagrams.md](docs/uml-diagrams.md).
 
 ---
+## Proposed System
+The proposed system enhances multimedia security by integrating
+AES-GCM based authenticated encryption with Fernet key
+management and forensic watermarking. Unlike existing systems,
+this approach ensures both confidentiality and integrity while
+preserving audio and video quality.
+
+
 
 ## Security & Compliance
 - **Encryption:** AES‑256‑GCM authenticated encryption per file
@@ -109,6 +142,18 @@ A full UML set is available in [docs/uml-diagrams.md](docs/uml-diagrams.md).
 - ✅ Final security audit checklist
 
 ---
+## System Requirements
+
+### Hardware Requirements
+- Processor: Dual Core 2 Duo
+- RAM: 4 GB
+- Hard Disk: 250 GB
+
+### Software Requirements
+- Operating System: Windows 7 / 8 / 10
+- Platform: Anaconda
+- Programming Language: Python
+- Front End: Spyder 3
 
 ## Conclusion
 SecureMedia meets all functional, security, and deployment requirements for a secure media protection platform. The system is fully tested, production‑ready, and supported by comprehensive documentation and UML diagrams.

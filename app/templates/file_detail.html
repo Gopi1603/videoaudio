@@ -69,8 +69,15 @@
       <!-- Actions -->
       <div class="d-flex gap-2 mt-4">
         {% if media.status == 'encrypted' %}
+        <a href="{{ url_for('media.verify_encryption', file_id=media.id) }}" class="btn btn-outline-success">
+          <i class="bi bi-shield-check me-1"></i>Verify Encryption
+        </a>
         <a href="{{ url_for('media.download', file_id=media.id) }}" class="btn btn-primary">
           <i class="bi bi-download me-1"></i>Download &amp; Decrypt
+        </a>
+        <a href="{{ url_for('media.download_encrypted', file_id=media.id) }}" class="btn btn-outline-warning"
+           title="Download the raw encrypted ciphertext (won't play — proves encryption)">
+          <i class="bi bi-file-earmark-lock me-1"></i>Download Encrypted
         </a>
         <form method="POST" action="{{ url_for('media.delete', file_id=media.id) }}"
               onsubmit="return confirm('Delete this file permanently? This cannot be undone.');">
