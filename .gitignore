@@ -21,6 +21,10 @@ instance/
 # Storage (encrypted files)
 storage/
 
+# Nginx TLS certs
+nginx/certs/
+*.pem
+
 # Test / cache
 .pytest_cache/
 .coverage

@@ -1,0 +1,227 @@
+# 🔐 SecureMedia — Digital Audio & Video Encryption with Watermarking
+
+[![CI/CD](https://github.com/Gopi1603/videoaudio/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Gopi1603/videoaudio/actions)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://python.org)
+[![Tests](https://img.shields.io/badge/tests-135%20passed-brightgreen.svg)](#testing)
+
+A production-ready Flask web application for **encrypting**, **forensic watermarking**, and **policy-controlled access management** of audio and video files. Built for educational content protection with FERPA-compliant audit logging.
+
+---
+
+## ✨ Features
+
+| Feature | Technology | Description |
+|---------|-----------|-------------|
+| 🔒 **Encryption** | AES-256-GCM + Fernet | Military-grade authenticated encryption with key wrapping |
+| 🏷️ **Watermarking** | Spread-spectrum + DWT | Imperceptible forensic watermarks for audio & video |
+| 🔑 **Key Management** | Shamir's Secret Sharing | Split keys into shares, threshold reconstruction |
+| 🛡️ **Access Control** | RBAC + ABAC | 6 policy types: owner-only, shared, time-limited, multi-party |
+| 📋 **Audit Trail** | Full event logging | Every action logged for FERPA compliance |
+| 🎨 **Modern UI** | Bootstrap 5.3 dark theme | Responsive dashboard, drag-drop upload, admin panel |
+| 🐳 **Containerized** | Docker + Nginx + PostgreSQL | Production-ready deployment stack |
+| 🚀 **CI/CD** | GitHub Actions | Automated lint → test → build → deploy pipeline |
+
+---
+
+## 🚀 Quick Start
+
+### Option 1: Local Development
+```bash
+git clone https://github.com/Gopi1603/videoaudio.git
+cd videoaudio
+pip install -r requirements.txt
+python run.py                    # → http://127.0.0.1:5000
+flask seed-admin                 # Create admin account
+```
+
+### Option 2: Docker
+```bash
+cp .env.example .env             # Configure secrets
+docker compose up --build        # → http://localhost:8000
+docker compose exec web flask seed-admin
+```
+
+### Default Admin Credentials
+```
+Email:    admin@securemedia.local
+Password: Admin@1234
+```
+⚠️ **Change these immediately in production!**
+
+---
+
+## 📸 Screenshots
+
+### Dashboard
+- Dark theme with stats cards (total files, storage, watermarked, encrypted)
+- File table with download, detail, and delete actions
+- Responsive Bootstrap 5.3.3 layout
+
+### Upload
+- Drag-and-drop upload zone
+- Supports: MP3, WAV, OGG, FLAC, AAC, MP4, AVI, MKV, MOV, WEBM
+- Real-time encryption progress spinner
+
+### Admin Panel
+- User management (promote/demote admin)
+- Key management (view, revoke, rotate)
+- Policy management (6 policy types)
+- Audit log viewer
+
+---
+
+## 🏗️ Architecture
+
+```
+Client → Nginx (HTTPS/TLS) → Gunicorn (WSGI) → Flask App
+                                                    │
+                    ┌───────────────────────────────┤
+                    │              │                 │
+              Auth Blueprint  Media Blueprint  Admin Blueprint
+                    │              │                 │
+                    └──────┬───────┘                 │
+                           │                         │
+              ┌────────────┼─────────────┐          │
+              │            │             │          │
+         Encryption   Watermarking    KMS     Policy Engine
+         AES-256-GCM  Spread-Spec   Shamir    RBAC+ABAC
+         + Fernet     + DWT Video    SSS      6 policies
+              │            │             │          │
+              └────────────┼─────────────┘          │
+                           │                         │
+                    ┌──────┴──────┐                  │
+                    │             │                   │
+               SQLite/PgSQL   File Storage      Audit Logs
+```
+
+---
+
+## 🔐 Security
+
+### Encryption Pipeline
+1. **AES-256-GCM**: Authenticated encryption (confidentiality + integrity)
+2. **Fernet Key Wrapping**: AES keys encrypted before database storage
+3. **12-byte Random Nonce**: Unique per encryption, prevents replay attacks
+4. **Tamper Detection**: 7 attack vectors tested — all detected
+
+### Watermarking
+- **Audio**: Spread-spectrum encoding, SNR 15–18 dB (imperceptible)
+- **Video**: DWT (Discrete Wavelet Transform), PSNR 26+ dB
+- **Payload**: `uid:<user_id>|ts:<timestamp>` — forensic traceability
+
+### Access Control
+- **RBAC**: Admin and user roles with decorator-based enforcement
+- **ABAC**: Owner-only, time-limited, shared, multi-party policies
+- **Policy Engine**: Evaluated on every download request
+
+---
+
+## 🧪 Testing
+
+**135 tests** covering all modules — run in ~36 seconds:
+
+```bash
+python -m pytest tests/ -v --tb=short
+```
+
+| Test Suite | Tests | Coverage |
+|-----------|-------|---------|
+| Encryption (basic + edge cases + tampering) | 37 | AES-GCM, Fernet, 7 tamper vectors |
+| Watermarking (fidelity + robustness + batch) | 22 | SNR, PSNR, noise, resample |
+| KMS & Policy (Shamir + RBAC + ABAC) | 20 | Key lifecycle, 6 policy types |
+| Routes & Auth | 8 | Register, login, upload, download |
+| UI, REST API, Admin | 27 | Profile, file detail, error pages |
+| E2E Integration & Penetration | 21 | Lifecycle, 8 attack scenarios, audit |
+
+### Performance Benchmarks
+| Metric | Value |
+|--------|-------|
+| Encryption speed (10 MB) | 185 MB/s |
+| Decryption speed (10 MB) | 288 MB/s |
+| Dashboard response | < 2 ms |
+| API response | < 2 ms |
+| Audio watermark (0.8 MB) | 53 ms |
+| Video watermark (90 frames) | 223 ms |
+
+---
+
+## 📁 Project Structure
+
+```
+├── app/
+│   ├── __init__.py          # App factory + extensions
+│   ├── models.py            # User, MediaFile, AuditLog
+│   ├── encryption.py        # AES-256-GCM + Fernet
+│   ├── kms.py               # Key Management + Shamir SSS
+│   ├── policy.py            # RBAC/ABAC policy engine
+│   ├── auth/                # Authentication blueprint
+│   ├── media/               # Media operations blueprint
+│   ├── admin/               # Admin management blueprint
+│   ├── watermark/           # Audio + video watermarking
+│   └── templates/           # Jinja2 templates
+├── tests/                   # 135 pytest tests
+├── docs/                    # Full documentation set
+├── nginx/                   # Reverse proxy config
+├── .github/workflows/       # CI/CD pipeline
+├── Dockerfile               # Multi-stage production image
+├── docker-compose.yml       # Full stack orchestration
+├── config.py                # Dev/Test/Prod configs
+├── run.py                   # Development entry point
+├── wsgi.py                  # Production entry point
+└── requirements.txt         # Python dependencies
+```
+
+---
+
+## 📚 Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Developer Guide](docs/developer-guide.md) | Architecture, setup, module reference, deployment |
+| [User Guide](docs/user-guide.md) | End-user workflows with step-by-step instructions |
+| [Admin & Policy Manual](docs/admin-policy-manual.md) | Admin panel, KMS, policy engine, audit logs |
+| [API Reference](docs/api-reference.md) | All endpoints with request/response examples |
+| [Architecture](docs/architecture.md) | System design, data flow, component diagram |
+| [Security Audit](docs/security-audit-final.md) | 66-point security checklist (all passing) |
+| [Phase 6 Validation](docs/phase6-validation-report.md) | Test results, metrics, issue log |
+| [Tech Stack](docs/tech-stack.md) | Technology choices and rationale |
+
+---
+
+## 🛠️ Deployment
+
+### Docker Compose (Recommended)
+```bash
+cp .env.example .env          # Set SECRET_KEY, FERNET_MASTER_KEY, DB credentials
+docker compose up -d           # Starts Flask + PostgreSQL + Nginx
+```
+
+### Cloud (AWS)
+- **Compute**: ECS/Fargate with Docker image
+- **Database**: RDS PostgreSQL
+- **Storage**: S3 with SSE-S3 encryption at rest
+- **HTTPS**: ALB + ACM certificate
+- **Secrets**: AWS Secrets Manager for keys
+
+### CI/CD Pipeline
+Automated via GitHub Actions:
+1. **Lint** → flake8 code quality
+2. **Test** → 135 tests with coverage report
+3. **Build** → Docker image
+4. **Push** → Docker Hub (on version tags)
+5. **Deploy** → SSH to production server (on version tags)
+
+---
+
+## 📜 License
+
+This project is developed for educational purposes as part of a Digital Audio & Video Encryption research project.
+
+---
+
+## 🙏 Acknowledgments
+
+- [Cryptography library](https://cryptography.io/) — AES-GCM and Fernet implementation
+- [Flask](https://flask.palletsprojects.com/) — Web framework
+- [Bootstrap 5](https://getbootstrap.com/) — UI framework
+- Research references on watermarking imperceptibility and encryption best practices (see [phases.md](rules/phases.md) for full citations)

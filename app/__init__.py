@@ -2,6 +2,7 @@
 
 import os
 from flask import Flask, render_template, jsonify, request
+from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_wtf.csrf import CSRFProtect
@@ -64,5 +65,15 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
     # Create tables on first request (dev convenience)
     with app.app_context():
         db.create_all()
+
+    # ----- Health check endpoint (used by Docker / load balancers) -----
+    @app.route("/health")
+    def health_check():
+        """Lightweight health probe — returns 200 if app is alive."""
+        try:
+            db.session.execute(text("SELECT 1"))
+            return jsonify({"status": "healthy", "db": "ok"}), 200
+        except Exception as e:
+            return jsonify({"status": "unhealthy", "db": str(e)}), 503
 
     return app

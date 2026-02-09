@@ -1,0 +1,72 @@
+# ── SecureMedia — Docker Compose ────────────────────────────────────────
+# Development & production orchestration.
+#
+# Quick start:
+#   cp .env.example .env          # fill in secrets
+#   docker compose up --build     # launches app + db
+# ────────────────────────────────────────────────────────────────────────
+
+services:
+  # ── Flask App (Gunicorn) ──
+  web:
+    build: .
+    container_name: securemedia-web
+    ports:
+      - "${PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-securemedia}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-securemedia}
+    volumes:
+      - media_storage:/app/storage
+      - db_data_sqlite:/app/instance   # only used if SQLite fallback
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ── PostgreSQL Database ──
+  db:
+    image: postgres:16-alpine
+    container_name: securemedia-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-securemedia}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_DB: ${POSTGRES_DB:-securemedia}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-securemedia}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Nginx Reverse Proxy (HTTPS termination) ──
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: securemedia-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  media_storage:
+    driver: local
+  db_data:
+    driver: local
+  db_data_sqlite:
+    driver: local

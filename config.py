@@ -32,3 +32,13 @@ class TestingConfig(Config):
 
 class ProductionConfig(Config):
     DEBUG = False
+
+    # Security hardening
+    SESSION_COOKIE_SECURE = True        # cookies only over HTTPS
+    SESSION_COOKIE_HTTPONLY = True       # no JS access to session cookie
+    SESSION_COOKIE_SAMESITE = "Lax"     # CSRF mitigation
+    REMEMBER_COOKIE_SECURE = True
+    REMEMBER_COOKIE_HTTPONLY = True
+
+    # Trust proxy headers from Nginx
+    PREFERRED_URL_SCHEME = "https"
