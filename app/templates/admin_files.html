@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Admin — All Files{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">All Encrypted Files (Admin)</h2>
+
+{% if files %}
+<div class="table-responsive">
+  <table class="table table-dark table-striped align-middle">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Owner</th>
+        <th>Filename</th>
+        <th>Size</th>
+        <th>Status</th>
+        <th>Uploaded</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for f in files %}
+      <tr>
+        <td>{{ f.id }}</td>
+        <td>{{ f.owner.username }}</td>
+        <td>{{ f.original_filename }}</td>
+        <td>{{ "%.2f"|format(f.file_size / 1048576) }} MB</td>
+        <td>
+          <span class="badge {{ 'bg-success' if f.status == 'encrypted' else 'bg-danger' }}">
+            {{ f.status }}
+          </span>
+        </td>
+        <td>{{ f.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+        <td>
+          {% if f.status == 'encrypted' %}
+          <a href="{{ url_for('media.download', file_id=f.id) }}"
+             class="btn btn-sm btn-outline-light me-1">⬇</a>
+          <form method="POST" action="{{ url_for('media.delete', file_id=f.id) }}"
+                class="d-inline"
+                onsubmit="return confirm('Delete this file permanently?');">
+            <button class="btn btn-sm btn-outline-danger">🗑</button>
+          </form>
+          {% else %}
+          <span class="text-muted">—</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-secondary">No files in the system.</p>
+{% endif %}
+{% endblock %}

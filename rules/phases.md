@@ -1,5 +1,9 @@
 Project Plan: Digital Audio & Video Encryption with Watermarking Scheme
 This plan breaks the development into seven phases, each with objectives, goals, task checklists, and deliverables. It aligns with the PRD requirements (roles, AES‑GCM & Fernet encryption, watermark embedding, key management, authentication, policy control, and cloud storage) and incorporates relevant research insights (e.g. testing encryption robustness and watermark fidelity).
+
+
+
+
 Phase 1: Discovery & Planning
 Objective: Define scope, architecture, and technical approach. This phase gathers requirements (from the PRD and user stories) and research: e.g. AES‑GCM for authenticated encryption (providing confidentiality + integrity[1][2]), Fernet for symmetric authenticated encryption[3], and forensic watermarking for educational content[4]. We’ll choose the tech stack (Flask/Python, Cryptography libraries, DB, cloud storage) and outline user roles (Admin, Instructor/Staff).
 Goals:
@@ -19,6 +23,11 @@ Deliverables:
 - Project backlog & timeline: Detailed feature list and development timeline by phase.
 - Tech stack decision log: Justification for libraries/tools (citing standards like AES‑GCM for security[1]).
 - Initial prototypes: Optional mini-scripts demonstrating AES‑GCM and Fernet encryption on sample media files to validate approach.
+
+
+
+
+
 Phase 2: Prototype Development
 Objective: Build a minimal end-to-end prototype focusing on core encryption functionality. This includes a simple Flask app skeleton, user authentication scaffolding, and a proof-of-concept encryption/decryption pipeline.
 Goals:
@@ -38,6 +47,11 @@ Deliverables:
 - Auth integration: Demonstrated login/logout with at least two roles (Admin, User) and route protection.
 - Encryption validation: Proof (logs or tests) that AES‑GCM+Fernet encryption/decryption works end-to-end on sample files.
 - Prototype report: Document limitations discovered (e.g. encryption overhead, library issues) to address in next phases.
+
+
+
+
+
 Phase 3: Watermarking Integration
 Objective: Incorporate robust, imperceptible watermark embedding into the media upload pipeline. Each upload will embed a unique watermark (e.g. user ID, timestamp) into the audio/video before encryption.
 Goals:
@@ -55,6 +69,12 @@ Deliverables:
 - Watermarking module: Reusable code/functions for embedding and extracting watermarks in audio/video.
 - Integration test: A demo where uploading a file results in a watermarked, encrypted file; downloading and decrypting yields the original plus detectable watermark.
 - Quality report: Metrics or observations on watermark imperceptibility (e.g. audio quality scores, video frame comparisons) and robustness. If relevant, note any Kaggle-based experiment results on watermark fidelity under distortions.
+
+
+
+
+
+
 Phase 4: Key Management & Policy Engine
 Objective: Build a secure Key Management Service (KMS) and an access Policy Engine. This ensures only authorized users can decrypt files under admin-defined policies.
 Goals:
@@ -73,6 +93,10 @@ Deliverables:
 - Admin key management UI: Interfaces for key viewing/revocation.
 - Policy engine module: Implementation of the policy logic with example policies.
 - Test cases: Demonstrate that an unauthorized user is blocked by policy, and that key revocation prevents decryption.
+
+
+
+
 Phase 5: Frontend & API Completion
 Objective: Finalize the user interface and API endpoints to provide a complete, user-friendly application.
 Goals:
@@ -94,6 +118,13 @@ Deliverables:
 - Completed web UI and API: All specified pages and endpoints are functional and styled.
 - User guide: Screenshots or docs explaining user workflows (e.g. how to upload and download).
 - Security review notes: Verify authentication/session management follows best practices (like Flask-Login usage[6]) and no secret keys are exposed in code.
+
+
+
+
+
+
+
 Phase 6: Testing & Validation
 Objective: Rigorously test and validate the system’s security, functionality, and performance.
 Goals:
@@ -114,6 +145,14 @@ Deliverables:
 - Issue log: Document any bugs found and fixed.
 - Metrics: Performance numbers (e.g. encryption speed, average CPU/RAM during upload).
 - Validation report: Summarize findings, stating that AES‑GCM+Fernet encryption was verified and watermark fidelity met criteria[5].
+
+
+
+
+
+
+
+
 Phase 7: Deployment & Documentation
 Objective: Deploy the application in a production-like environment and finalize all documentation.
 Goals:
@@ -136,6 +175,17 @@ Deliverables:
 - Documentation set: Final polished documents (README, API reference, user/admin guides). All sensitive info (keys) must be redacted.
 - Project handover package: Include source code repository, docs, and any training materials needed for administrators.
 Throughout all phases, we ensure compliance with the PRD: encrypted files use AES‑GCM and Fernet[1][3]; each media gets a unique watermark for traceability[4]; user roles and policies are enforced (Oso-like RBAC)[6]; and audit logs are maintained for all key operations. We will also leverage experiments (e.g. Kaggle notebooks) to validate encryption strength and watermark resilience, ensuring the final application is robust, secure, and fully documented.
+
+
+
+
+
+
+
+
+
+
+
 Sources: Industry docs and research on encryption (AES‑GCM provides confidentiality+integrity[1][2], Fernet offers authenticated encryption[3]) and watermarking (imperceptible identification for educational media[4][5]), plus best practices for access control (Flask-Login session management[6], and policy frameworks[10]) and secure storage[9]. These guided our planning and will be cited in the development documentation.
 ________________________________________
 [1] Understanding AES Encryption and AES/GCM Mode: An In-Depth Exploration using Java | by Pravallika Yakkala | Medium
