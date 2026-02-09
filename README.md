@@ -72,6 +72,11 @@ Password: admin
 
 ```sql
 GRANT ALL PRIVILEGES ON DATABASE securemedia TO securemedia_user;
+GRANT USAGE, CREATE ON SCHEMA public TO securemedia_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON TABLES TO securemedia_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+GRANT ALL ON SEQUENCES TO securemedia_user;
 ```
 
 ### 4) Update `.env` (or `config.py`)
@@ -81,7 +86,16 @@ Set this before running the app:
 DATABASE_URL=postgresql://securemedia_user:securemedia_pass@localhost:5432/securemedia
 ```
 
-### 5) Run the app
+### 5) Generate `FERNET_MASTER_KEY`
+Run:
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Paste the output into `FERNET_MASTER_KEY` in `.env`.
+
+### 6) Run the app
 The app auto-creates all tables on first run via `db.create_all()`.
 
 #### Auto-created tables
