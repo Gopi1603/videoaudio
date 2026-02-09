@@ -139,12 +139,12 @@
     {% block extra_css %}{% endblock %}
   </style>
 </head>
-<body>
+<body class="{% block body_class %}{% endblock %}">
   <!-- Navbar -->
   <nav class="navbar navbar-expand-lg sticky-top">
     <div class="container">
       <a class="navbar-brand text-white" href="{{ url_for('media.dashboard') }}">
-        <i class="bi bi-shield-lock-fill me-1" style="color:var(--sm-primary)"></i>SecureMedia
+        <i class="bi bi-shield-lock-fill me-1" style="color:var(--sm-primary)"></i>{% block brand_label %}SecureMedia{% endblock %}
       </a>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
               data-bs-target="#navMain" aria-controls="navMain" aria-expanded="false" aria-label="Toggle navigation">
@@ -205,16 +205,18 @@
           </li>
         </ul>
         {% else %}
+        <ul class="navbar-nav mx-auto">
+          <li class="nav-item"><a class="nav-link" href="#products">Products</a></li>
+          <li class="nav-item"><a class="nav-link" href="#company">Company</a></li>
+          <li class="nav-item"><a class="nav-link" href="#pricing">Pricing</a></li>
+          <li class="nav-item"><a class="nav-link" href="#accountants">For Accountants</a></li>
+        </ul>
         <ul class="navbar-nav ms-auto">
           <li class="nav-item">
-            <a class="nav-link" href="{{ url_for('auth.login') }}">
-              <i class="bi bi-box-arrow-in-right me-1"></i>Log In
-            </a>
+            <a class="nav-link" href="{{ url_for('auth.login') }}">Log in</a>
           </li>
           <li class="nav-item ms-2">
-            <a class="btn btn-primary btn-sm" href="{{ url_for('auth.register') }}">
-              <i class="bi bi-person-plus me-1"></i>Register
-            </a>
+            <a class="btn btn-dark btn-sm" href="{{ url_for('auth.register') }}">Get Started</a>
           </li>
         </ul>
         {% endif %}
@@ -241,7 +243,7 @@
   </div>
 
   <!-- Content -->
-  <main class="container py-4">
+  <main class="{% block main_class %}container py-4{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 

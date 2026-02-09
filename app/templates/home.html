@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}SecureMedia — Home{% endblock %}
+{% block body_class %}home-hero{% endblock %}
+{% block brand_label %}Nickel{% endblock %}
+{% block main_class %}p-0{% endblock %}
+
+{% block extra_css %}
+.home-hero .navbar {
+  position: absolute;
+  width: 100%;
+  background: rgba(0,0,0,.1);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.home-hero .navbar .btn.btn-dark {
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.12);
+}
+.home-hero .navbar .btn.btn-dark:hover { background: rgba(255,255,255,.2); }
+.hero-section {
+  position: relative;
+  overflow: hidden;
+}
+.hero-bg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.hero-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,.85), rgba(0,0,0,.35), rgba(0,0,0,.1));
+}
+.hero-content {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  padding-top: 6.5rem;
+  padding-bottom: 5rem;
+}
+.hero-card {
+  background: rgba(13,13,18,.7);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+}
+@media (max-width: 991px) {
+  .hero-content { padding-top: 7.5rem; }
+}
+{% endblock %}
+
+{% block content %}
+<section class="hero-section" id="products">
+  <img src="/hero-bg2.png" alt="SecureMedia hero background" class="hero-bg" />
+  <div class="hero-overlay"></div>
+  <div class="container hero-content">
+    <div class="row align-items-center">
+      <div class="col-lg-6 offset-lg-6 text-lg-end">
+        <p class="text-uppercase text-warning fw-semibold small mb-2">Dark Mode SaaS</p>
+        <h1 class="display-5 fw-bold text-white">Secure Every Frame. Protect Every Sound.</h1>
+        <p class="fs-6 text-muted">
+          Encrypt videos and audio files in real time, control access, prevent leaks, and ensure
+          complete privacy across devices and platforms.
+        </p>
+        <div class="d-flex flex-wrap gap-2 justify-content-lg-end mt-4">
+          <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Get Started</a>
+          <a class="btn btn-outline-light" href="#company">See How It Works</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5" id="company">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-md-4">
+        <div class="card p-4 h-100">
+          <h5 class="fw-semibold">Upload → Watermark</h5>
+          <p class="text-muted mb-0">Embed a unique forensic watermark on every file.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-4 h-100">
+          <h5 class="fw-semibold">Encrypt → Store</h5>
+          <p class="text-muted mb-0">AES‑256‑GCM encryption with secure key wrapping.</p>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-4 h-100">
+          <h5 class="fw-semibold">Decrypt → Verify</h5>
+          <p class="text-muted mb-0">Policy‑controlled access and audit‑ready downloads.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5" id="pricing">
+  <div class="container">
+    <div class="card p-4">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h4 class="fw-bold">Ready to secure your media?</h4>
+          <p class="text-muted mb-0">Start free, upgrade when you scale.</p>
+        </div>
+        <div class="col-md-4 text-md-end mt-3 mt-md-0">
+          <a class="btn btn-primary" href="{{ url_for('auth.register') }}">Get Started</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-5" id="accountants">
+  <div class="container text-center">
+    <p class="text-muted mb-0">Trusted by teams who value privacy, compliance, and control.</p>
+  </div>
+</section>
+{% endblock %}

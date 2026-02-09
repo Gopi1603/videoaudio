@@ -1,7 +1,7 @@
 """Application factory – creates and configures the Flask app."""
 
 import os
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, send_from_directory
 from sqlalchemy import text
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
@@ -75,5 +75,11 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
             return jsonify({"status": "healthy", "db": "ok"}), 200
         except Exception as e:
             return jsonify({"status": "unhealthy", "db": str(e)}), 503
+
+    # ----- Static hero background (served from project root) -----
+    @app.route("/hero-bg.png")
+    def hero_background():
+        project_root = os.path.abspath(os.path.join(app.root_path, os.pardir))
+        return send_from_directory(project_root, "hero-bg.png")
 
     return app

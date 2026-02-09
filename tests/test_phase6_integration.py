@@ -189,13 +189,17 @@ class TestPolicyPenetration:
         assert b"Admin access required" in rv.data or b"Dashboard" in rv.data
 
     def test_unauthenticated_access_redirects(self, client, app):
-        """All protected routes redirect unauthenticated users to login."""
-        protected = ["/", "/upload", "/profile", "/admin/files",
+        """Protected routes redirect unauthenticated users to login."""
+        protected = ["/upload", "/profile", "/admin/files",
                      "/admin/keys", "/admin/users", "/admin/policies",
                      "/admin/audit", "/api/files"]
         for url in protected:
             rv = client.get(url)
             assert rv.status_code in (302, 401), f"{url} accessible without login"
+
+    def test_unauthenticated_home_is_public(self, client, app):
+        rv = client.get("/")
+        assert rv.status_code == 200
 
     def test_delete_others_file_rejected(self, client, app):
         """User cannot delete another user's file via POST."""

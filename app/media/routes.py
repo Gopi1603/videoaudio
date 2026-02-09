@@ -30,8 +30,9 @@ def _allowed(filename: str) -> bool:
 # Dashboard (landing page after login)
 # -------------------------------------------------------------------------
 @media_bp.route("/")
-@login_required
 def dashboard():
+    if not current_user.is_authenticated:
+        return render_template("home.html")
     files = MediaFile.query.filter_by(owner_id=current_user.id, status="encrypted").all()
     return render_template("dashboard.html", files=files)
 
