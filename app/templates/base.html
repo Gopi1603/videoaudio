@@ -169,6 +169,18 @@
               <i class="bi bi-cloud-arrow-up-fill me-1"></i>Upload
             </a>
           </li>
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle {{ 'active' if 'sharing' in (request.endpoint or '') }}"
+               href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-share-fill me-1"></i>Sharing
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><a class="dropdown-item" href="{{ url_for('sharing.received') }}">
+                <i class="bi bi-inbox me-2"></i>Shared with Me</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('sharing.sent') }}">
+                <i class="bi bi-send me-2"></i>Sent Shares</a></li>
+            </ul>
+          </li>
           {% if current_user.is_admin %}
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle {{ 'active' if 'admin' in (request.endpoint or '') }}"
@@ -184,6 +196,8 @@
                 <i class="bi bi-shield-check me-2"></i>Policies</a></li>
               <li><a class="dropdown-item" href="{{ url_for('admin.user_management') }}">
                 <i class="bi bi-people-fill me-2"></i>Users</a></li>
+              <li><a class="dropdown-item" href="{{ url_for('admin.share_audit') }}">
+                <i class="bi bi-share me-2"></i>Share Audit</a></li>
               <li><hr class="dropdown-divider"></li>
               <li><a class="dropdown-item" href="{{ url_for('admin.audit_logs') }}">
                 <i class="bi bi-journal-text me-2"></i>Audit Logs</a></li>

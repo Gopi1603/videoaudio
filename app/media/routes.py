@@ -13,7 +13,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.models import MediaFile, AuditLog, User
+from app.models import MediaFile, AuditLog, User, ShareToken
 from app.encryption import encrypt_file, decrypt_file, unwrap_key
 from app.kms import store_key
 from app.watermark import embed_watermark, extract_watermark, AUDIO_EXTENSIONS, VIDEO_EXTENSIONS
@@ -403,16 +403,35 @@ def share(file_id: int):
         if u.id != media.owner_id
     ]
 
+    # Permissions from form
+    permission = request.form.get("permission", "stream")
+    allow_download = permission == "download"
+    ttl_hours = request.form.get("ttl_hours", 24, type=int)
+
     if valid_ids:
+        # Create policy-level share (existing behaviour)
         share_file(media.id, current_user.id, valid_ids)
+
+        # Create per-user ShareToken for encrypted delivery
+        created_tokens = []
+        for uid in valid_ids:
+            tok = ShareToken.create(
+                media_id=media.id,
+                sender_id=current_user.id,
+                recipient_id=uid,
+                allow_download=allow_download,
+                ttl_hours=ttl_hours,
+            )
+            created_tokens.append(tok)
+
         usernames = [u.username for u in User.query.filter(User.id.in_(valid_ids)).all()]
         db.session.add(AuditLog(
             user_id=current_user.id, action="share",
             media_id=media.id, result="success",
-            detail=f"Shared with: {', '.join(usernames)}",
+            detail=f"Shared with: {', '.join(usernames)} | download={allow_download} ttl={ttl_hours}h",
         ))
         db.session.commit()
-        flash(f"File shared with {', '.join(usernames)}.", "success")
+        flash(f"File shared with {', '.join(usernames)} via secure token (expires in {ttl_hours}h).", "success")
     else:
         flash("No valid users selected.", "warning")
 
@@ -434,10 +453,19 @@ def revoke(file_id: int, user_id: int):
     target_user = db.session.get(User, user_id)
     revoke_share(media.id, user_id)
 
+    # Also revoke any active ShareTokens for this user + file
+    active_tokens = ShareToken.query.filter(
+        ShareToken.media_id == media.id,
+        ShareToken.recipient_id == user_id,
+        ShareToken.status != "revoked",
+    ).all()
+    for tok in active_tokens:
+        tok.revoke()
+
     db.session.add(AuditLog(
         user_id=current_user.id, action="revoke_share",
         media_id=media.id, result="success",
-        detail=f"Revoked access for: {target_user.username if target_user else user_id}",
+        detail=f"Revoked access + {len(active_tokens)} token(s) for: {target_user.username if target_user else user_id}",
     ))
     db.session.commit()
 

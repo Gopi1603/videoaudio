@@ -34,18 +34,20 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
     csrf.init_app(app)
 
     # Import models so SQLAlchemy knows about them
-    from app.models import User, MediaFile, AuditLog  # noqa: F401
+    from app.models import User, MediaFile, AuditLog, ShareToken  # noqa: F401
     from app.kms import KeyRecord, KeyShare  # noqa: F401
-    from app.policy import Policy, PolicyLog  # noqa: F401
+    from app.policy import Policy, PolicyLog, PolicyType  # noqa: F401
 
     # Register blueprints
     from app.auth.routes import auth_bp
     from app.media.routes import media_bp
     from app.admin.routes import admin_bp
+    from app.sharing.routes import sharing_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(media_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(sharing_bp)
 
     # ----- Error handlers -----
     @app.errorhandler(404)
@@ -82,8 +84,23 @@ def create_app(config_name: str = "config.DevelopmentConfig") -> Flask:
                 db.session.add(admin)
                 db.session.commit()
                 app.logger.info("Default admin created")
+
+            # Create a default global policy if none exist
+            if not Policy.query.first():
+                admin_user = User.query.filter_by(role="admin").first()
+                default_policy = Policy(
+                    media_id=None,
+                    is_global=True,
+                    policy_type=PolicyType.OWNER_ONLY.value,
+                    priority=0,
+                    created_by=admin_user.id if admin_user else None,
+                    enabled=True,
+                )
+                db.session.add(default_policy)
+                db.session.commit()
+                app.logger.info("Default owner-only policy created")
         except Exception as e:
-            app.logger.warning(f"Admin auto-create skipped: {e}")
+            app.logger.warning(f"Admin/policy auto-create skipped: {e}")
 
     # ----- Health check endpoint (used by Docker / load balancers) -----
     @app.route("/health")

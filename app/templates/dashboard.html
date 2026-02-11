@@ -133,7 +133,12 @@
 {% if shared_files %}
 <div class="page-header mt-5">
   <h2><i class="bi bi-people me-2" style="color:var(--sm-primary)"></i>Shared with Me</h2>
-  <span class="badge bg-primary">{{ shared_files|length }} file{{ 's' if shared_files|length != 1 }}</span>
+  <div class="d-flex gap-2 align-items-center">
+    <span class="badge bg-primary">{{ shared_files|length }} file{{ 's' if shared_files|length != 1 }}</span>
+    <a href="{{ url_for('sharing.received') }}" class="btn btn-sm btn-outline-light">
+      <i class="bi bi-key me-1"></i>View Secure Tokens
+    </a>
+  </div>
 </div>
 
 <div class="card">
@@ -144,6 +149,7 @@
           <th>File</th>
           <th>Owner</th>
           <th>Size</th>
+          <th>Access</th>
           <th>Shared</th>
           <th class="text-end">Actions</th>
         </tr>
@@ -168,6 +174,9 @@
           </td>
           <td>{{ "%.2f"|format(f.file_size / 1048576) }} MB</td>
           <td>
+            <span class="badge bg-success"><i class="bi bi-lock-fill me-1"></i>Encrypted</span>
+          </td>
+          <td>
             <span title="{{ f.created_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}">
               {{ f.created_at.strftime('%b %d, %Y') }}
             </span>
@@ -177,9 +186,9 @@
                class="btn btn-sm btn-outline-secondary me-1" title="Details">
               <i class="bi bi-info-circle"></i>
             </a>
-            <a href="{{ url_for('media.download', file_id=f.id) }}"
-               class="btn btn-sm btn-outline-light me-1" title="Download & Decrypt">
-              <i class="bi bi-download"></i>
+            <a href="{{ url_for('sharing.received') }}"
+               class="btn btn-sm btn-outline-primary me-1" title="Unlock via token">
+              <i class="bi bi-unlock"></i>
             </a>
           </td>
         </tr>

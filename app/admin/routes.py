@@ -1,4 +1,4 @@
-"""Admin blueprint for key management and policy control."""
+"""Admin blueprint for key management, policy control, and share audit."""
 
 from functools import wraps
 from datetime import datetime, timezone
@@ -8,7 +8,7 @@ from flask_login import login_required, current_user
 
 from app import db
 from app import csrf
-from app.models import User, MediaFile, AuditLog
+from app.models import User, MediaFile, AuditLog, ShareToken
 from app.kms import (
     KeyRecord, KeyShare, get_key_info, list_keys, revoke_key, 
     store_key, generate_file_key, retrieve_key
@@ -356,3 +356,92 @@ def api_check_access():
     )
     
     return jsonify({"allowed": allowed, "reason": reason})
+
+
+# ---------------------------------------------------------------------------
+# Share Audit Dashboard
+# ---------------------------------------------------------------------------
+
+@admin_bp.route("/share-audit")
+@login_required
+@admin_required
+def share_audit():
+    """Admin dashboard: review all share tokens, access history, revocation."""
+    page = request.args.get("page", 1, type=int)
+    status_filter = request.args.get("status", "")
+
+    query = ShareToken.query.order_by(ShareToken.created_at.desc())
+    if status_filter:
+        query = query.filter_by(status=status_filter)
+
+    tokens = query.paginate(page=page, per_page=30, error_out=False)
+
+    # Stats
+    total_tokens = ShareToken.query.count()
+    active_tokens = ShareToken.query.filter(
+        ShareToken.status.in_(["pending", "verified", "used"])
+    ).count()
+    revoked_tokens = ShareToken.query.filter_by(status="revoked").count()
+    expired_count = 0
+    for t in ShareToken.query.filter(ShareToken.status != "revoked").all():
+        if t.is_expired:
+            expired_count += 1
+
+    # Recent share-related audit logs
+    share_logs = AuditLog.query.filter(
+        AuditLog.action.like("share%")
+    ).order_by(AuditLog.timestamp.desc()).limit(50).all()
+
+    return render_template(
+        "admin/share_audit.html",
+        tokens=tokens,
+        total_tokens=total_tokens,
+        active_tokens=active_tokens,
+        revoked_tokens=revoked_tokens,
+        expired_count=expired_count,
+        share_logs=share_logs,
+        status_filter=status_filter,
+    )
+
+
+@admin_bp.route("/share-audit/revoke/<int:token_id>", methods=["POST"])
+@login_required
+@admin_required
+def admin_revoke_token(token_id: int):
+    """Admin: revoke any share token."""
+    st = ShareToken.query.get_or_404(token_id)
+    st.revoke()
+
+    db.session.add(AuditLog(
+        user_id=current_user.id, action="share_admin_revoke",
+        media_id=st.media_id, result="success",
+        detail=f"Admin revoked token {st.token[:8]}… for user {st.recipient_id}",
+    ))
+    db.session.commit()
+
+    flash(f"Token for {st.recipient.username} revoked.", "info")
+    return redirect(url_for("admin.share_audit"))
+
+
+@admin_bp.route("/share-audit/revoke-all/<int:media_id>", methods=["POST"])
+@login_required
+@admin_required
+def admin_revoke_all_tokens(media_id: int):
+    """Admin: revoke all tokens for a specific file."""
+    tokens = ShareToken.query.filter(
+        ShareToken.media_id == media_id,
+        ShareToken.status != "revoked"
+    ).all()
+
+    for t in tokens:
+        t.revoke()
+
+    db.session.add(AuditLog(
+        user_id=current_user.id, action="share_admin_revoke_all",
+        media_id=media_id, result="success",
+        detail=f"Admin revoked {len(tokens)} token(s)",
+    ))
+    db.session.commit()
+
+    flash(f"All {len(tokens)} share token(s) for file #{media_id} revoked.", "info")
+    return redirect(url_for("admin.share_audit"))

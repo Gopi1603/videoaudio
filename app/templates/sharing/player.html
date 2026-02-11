@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Stream — {{ media.original_filename }}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .player-wrapper {
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .player-wrapper video,
+  .player-wrapper audio {
+    width: 100%;
+    display: block;
+  }
+  /* Block right-click on media */
+  .player-wrapper video,
+  .player-wrapper audio {
+    pointer-events: auto;
+  }
+  .stream-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 10;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb" class="mb-3">
+  <ol class="breadcrumb mb-0">
+    <li class="breadcrumb-item"><a href="{{ url_for('media.dashboard') }}">Dashboard</a></li>
+    <li class="breadcrumb-item"><a href="{{ url_for('sharing.received') }}">Shared with Me</a></li>
+    <li class="breadcrumb-item active">Stream</li>
+  </ol>
+</nav>
+
+<div class="row justify-content-center">
+  <div class="col-lg-10">
+    <div class="page-header">
+      <div>
+        <h2 class="mb-0">
+          {% if media.mime_type and 'video' in media.mime_type %}
+            <i class="bi bi-film me-2" style="color:var(--sm-primary)"></i>
+          {% else %}
+            <i class="bi bi-music-note-beamed me-2" style="color:var(--sm-primary)"></i>
+          {% endif %}
+          {{ media.original_filename }}
+        </h2>
+        <small class="text-muted">
+          Shared by {{ token.sender.username }} &middot;
+          {% if not token.allow_download %}
+            <span class="text-warning"><i class="bi bi-lock me-1"></i>Stream-only</span>
+          {% else %}
+            <span class="text-success"><i class="bi bi-download me-1"></i>Download allowed</span>
+          {% endif %}
+        </small>
+      </div>
+    </div>
+
+    <!-- Player -->
+    <div class="player-wrapper mb-4">
+      <div class="stream-badge">
+        <span class="badge bg-danger"><i class="bi bi-broadcast me-1"></i>LIVE STREAM</span>
+      </div>
+
+      {% if media.mime_type and 'video' in media.mime_type %}
+      <video controls controlsList="nodownload" disablepictureinpicture
+             oncontextmenu="return false;" autoplay>
+        <source src="{{ stream_url }}" type="{{ media.mime_type }}">
+        Your browser does not support video playback.
+      </video>
+      {% else %}
+      <div class="p-5 text-center">
+        <i class="bi bi-soundwave mb-3" style="font-size:4rem;color:var(--sm-primary)"></i>
+        <audio controls controlsList="nodownload" oncontextmenu="return false;"
+               style="width:100%;max-width:600px" autoplay>
+          <source src="{{ stream_url }}" type="{{ media.mime_type }}">
+          Your browser does not support audio playback.
+        </audio>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Info bar -->
+    <div class="card p-3">
+      <div class="row g-3 text-center">
+        <div class="col-md-3">
+          <small class="text-muted d-block">File Size</small>
+          <span class="fw-semibold">{{ "%.2f"|format(media.file_size / 1048576) }} MB</span>
+        </div>
+        <div class="col-md-3">
+          <small class="text-muted d-block">Encryption</small>
+          <span class="badge bg-success"><i class="bi bi-lock-fill me-1"></i>AES-256-GCM</span>
+        </div>
+        <div class="col-md-3">
+          <small class="text-muted d-block">Access Level</small>
+          {% if token.allow_download %}
+            <span class="badge bg-primary">Stream + Download</span>
+          {% else %}
+            <span class="badge bg-secondary">Stream Only</span>
+          {% endif %}
+        </div>
+        <div class="col-md-3">
+          <small class="text-muted d-block">Expires</small>
+          <span class="fw-semibold small">{{ token.expires_at.strftime('%b %d, %H:%M UTC') }}</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="d-flex gap-2 mt-3 justify-content-center">
+      {% if token.allow_download %}
+      <a href="{{ url_for('sharing.download', token=token.token) }}" class="btn btn-outline-light">
+        <i class="bi bi-download me-1"></i>Download Decrypted Copy
+      </a>
+      {% endif %}
+      <a href="{{ url_for('sharing.received') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back to Shared Files
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Prevent right-click download on media elements
+  document.querySelectorAll('video, audio').forEach(el => {
+    el.addEventListener('contextmenu', e => e.preventDefault());
+  });
+</script>
+{% endblock %}

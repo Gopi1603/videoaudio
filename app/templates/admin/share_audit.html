@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Share Audit — Admin — SecureMedia{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2><i class="bi bi-share me-2" style="color:var(--sm-primary)"></i>Share Audit Dashboard</h2>
+</div>
+
+<!-- Stats -->
+<div class="row g-3 mb-4">
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-link-45deg me-1"></i>Total Tokens</div>
+      <div class="stat-value">{{ total_tokens }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-check-circle me-1"></i>Active</div>
+      <div class="stat-value text-success">{{ active_tokens }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-x-circle me-1"></i>Revoked</div>
+      <div class="stat-value text-danger">{{ revoked_tokens }}</div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="stat-card">
+      <div class="stat-label"><i class="bi bi-clock me-1"></i>Expired</div>
+      <div class="stat-value text-warning">{{ expired_count }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filter -->
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="{{ url_for('admin.share_audit') }}"
+     class="btn btn-sm {{ 'btn-primary' if not status_filter else 'btn-outline-secondary' }}">All</a>
+  <a href="{{ url_for('admin.share_audit', status='pending') }}"
+     class="btn btn-sm {{ 'btn-primary' if status_filter=='pending' else 'btn-outline-secondary' }}">Pending</a>
+  <a href="{{ url_for('admin.share_audit', status='verified') }}"
+     class="btn btn-sm {{ 'btn-primary' if status_filter=='verified' else 'btn-outline-secondary' }}">Verified</a>
+  <a href="{{ url_for('admin.share_audit', status='used') }}"
+     class="btn btn-sm {{ 'btn-primary' if status_filter=='used' else 'btn-outline-secondary' }}">Used</a>
+  <a href="{{ url_for('admin.share_audit', status='revoked') }}"
+     class="btn btn-sm {{ 'btn-primary' if status_filter=='revoked' else 'btn-outline-secondary' }}">Revoked</a>
+</div>
+
+<!-- Token table -->
+<div class="card mb-4">
+  <div class="card-header">
+    <h6 class="mb-0"><i class="bi bi-table me-2"></i>Share Tokens</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>File</th>
+          <th>Sender</th>
+          <th>Recipient</th>
+          <th>Permission</th>
+          <th>Status</th>
+          <th>Verified</th>
+          <th>Used</th>
+          <th>Expires</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tokens.items %}
+        <tr class="{{ 'opacity-50' if t.status == 'revoked' or t.is_expired }}">
+          <td><code>{{ t.id }}</code></td>
+          <td>
+            {% if t.media.mime_type and 'video' in t.media.mime_type %}
+              <i class="bi bi-film me-1 text-info"></i>
+            {% else %}
+              <i class="bi bi-music-note-beamed me-1 text-warning"></i>
+            {% endif %}
+            <a href="{{ url_for('media.file_detail', file_id=t.media_id) }}" class="text-white text-decoration-none">
+              {{ t.media.original_filename|truncate(25) }}
+            </a>
+          </td>
+          <td><span class="badge bg-secondary">{{ t.sender.username }}</span></td>
+          <td>
+            <i class="bi bi-person me-1"></i>{{ t.recipient.username }}
+            <br><small class="text-muted">{{ t.recipient.email }}</small>
+          </td>
+          <td>
+            {% if t.allow_download %}
+              <span class="badge bg-primary"><i class="bi bi-download me-1"></i>DL</span>
+            {% else %}
+              <span class="badge bg-secondary"><i class="bi bi-play-circle me-1"></i>Stream</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.status == 'revoked' %}
+              <span class="badge bg-danger">Revoked</span>
+            {% elif t.is_expired %}
+              <span class="badge bg-warning text-dark">Expired</span>
+            {% elif t.status == 'pending' %}
+              <span class="badge bg-warning text-dark">Pending</span>
+            {% elif t.status == 'verified' %}
+              <span class="badge bg-success">Verified</span>
+            {% elif t.status == 'used' %}
+              <span class="badge bg-info">Used</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.verified_at %}
+              <small class="text-success">{{ t.verified_at.strftime('%b %d %H:%M') }}</small>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            {% if t.used_at %}
+              <small class="text-info">{{ t.used_at.strftime('%b %d %H:%M') }}</small>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <small class="{% if t.is_expired %}text-danger{% endif %}">
+              {{ t.expires_at.strftime('%b %d %H:%M') }}
+            </small>
+          </td>
+          <td class="text-end">
+            {% if t.status != 'revoked' and not t.is_expired %}
+            <form method="POST" action="{{ url_for('admin.admin_revoke_token', token_id=t.id) }}"
+                  class="d-inline" onsubmit="return confirm('Revoke this token?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger" title="Revoke">
+                <i class="bi bi-x-circle"></i>
+              </button>
+            </form>
+            {% else %}
+            <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <!-- Pagination -->
+  {% if tokens.pages > 1 %}
+  <div class="card-footer d-flex justify-content-center">
+    <nav>
+      <ul class="pagination pagination-sm mb-0">
+        {% for p in tokens.iter_pages() %}
+          {% if p %}
+          <li class="page-item {{ 'active' if p == tokens.page }}">
+            <a class="page-link" href="{{ url_for('admin.share_audit', page=p, status=status_filter) }}">{{ p }}</a>
+          </li>
+          {% else %}
+          <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+          {% endif %}
+        {% endfor %}
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Recent share audit logs -->
+<div class="card">
+  <div class="card-header">
+    <h6 class="mb-0"><i class="bi bi-journal-text me-2"></i>Recent Share Activity Logs</h6>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 table-sm">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>User</th>
+          <th>Action</th>
+          <th>File</th>
+          <th>Result</th>
+          <th>Detail</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in share_logs %}
+        <tr>
+          <td><small>{{ log.timestamp.strftime('%b %d %H:%M:%S') if log.timestamp else '—' }}</small></td>
+          <td>
+            {% set u = log.user_id %}
+            <small>UID: {{ u }}</small>
+          </td>
+          <td>
+            {% if 'revoke' in log.action %}
+              <span class="text-danger"><i class="bi bi-x-circle me-1"></i>{{ log.action }}</span>
+            {% elif 'verify' in log.action %}
+              <span class="text-success"><i class="bi bi-check-circle me-1"></i>{{ log.action }}</span>
+            {% elif 'stream' in log.action %}
+              <span class="text-info"><i class="bi bi-play-circle me-1"></i>{{ log.action }}</span>
+            {% elif 'download' in log.action %}
+              <span class="text-primary"><i class="bi bi-download me-1"></i>{{ log.action }}</span>
+            {% else %}
+              <span><i class="bi bi-share me-1"></i>{{ log.action }}</span>
+            {% endif %}
+          </td>
+          <td><small>{{ log.media_id or '—' }}</small></td>
+          <td>
+            <span class="badge bg-{{ 'success' if log.result == 'success' else 'danger' if log.result == 'failure' else 'warning' }}">
+              {{ log.result }}
+            </span>
+          </td>
+          <td><small class="text-muted">{{ log.detail|truncate(60) if log.detail else '—' }}</small></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

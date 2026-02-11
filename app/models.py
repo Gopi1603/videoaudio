@@ -1,6 +1,7 @@
-"""Database models – User and MediaFile."""
+"""Database models – User, MediaFile, ShareToken, and AuditLog."""
 
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timezone, timedelta
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -73,6 +74,96 @@ class AuditLog(db.Model):
 
     def __repr__(self) -> str:
         return f"<AuditLog {self.action} user={self.user_id}>"
+
+
+class ShareToken(db.Model):
+    """Short-lived token for encrypted media delivery to shared users.
+
+    Flow:
+      1. Owner/admin shares a file → a ShareToken is generated per recipient.
+      2. Recipient receives the token (URL link).
+      3. Recipient must authenticate (login) and verify identity to unlock.
+      4. On verification the token is marked 'used'; a time-limited decryption
+         session is created.
+    """
+    __tablename__ = "share_tokens"
+
+    id = db.Column(db.Integer, primary_key=True)
+    token = db.Column(db.String(128), unique=True, nullable=False, index=True)
+    media_id = db.Column(db.Integer, db.ForeignKey("media_files.id"), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    recipient_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+
+    # Permissions
+    allow_download = db.Column(db.Boolean, default=False)  # False = stream-only
+    allow_stream = db.Column(db.Boolean, default=True)
+
+    # Lifecycle
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    expires_at = db.Column(db.DateTime, nullable=False)
+    verified_at = db.Column(db.DateTime, nullable=True)   # identity-check timestamp
+    used_at = db.Column(db.DateTime, nullable=True)        # first playback/download
+    revoked_at = db.Column(db.DateTime, nullable=True)
+
+    status = db.Column(db.String(20), default="pending")
+    # pending → verified → used | expired | revoked
+
+    # Relationships
+    media = db.relationship("MediaFile", backref="share_tokens")
+    sender = db.relationship("User", foreign_keys=[sender_id], backref="sent_tokens")
+    recipient = db.relationship("User", foreign_keys=[recipient_id], backref="received_tokens")
+
+    @staticmethod
+    def generate_token() -> str:
+        return secrets.token_urlsafe(48)
+
+    @staticmethod
+    def create(media_id: int, sender_id: int, recipient_id: int,
+               allow_download: bool = False, ttl_hours: int = 24):
+        """Create a new share token with default 24-hour expiry."""
+        tok = ShareToken(
+            token=ShareToken.generate_token(),
+            media_id=media_id,
+            sender_id=sender_id,
+            recipient_id=recipient_id,
+            allow_download=allow_download,
+            expires_at=datetime.now(timezone.utc) + timedelta(hours=ttl_hours),
+        )
+        db.session.add(tok)
+        db.session.commit()
+        return tok
+
+    @property
+    def is_expired(self) -> bool:
+        now = datetime.now(timezone.utc)
+        exp = self.expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        return now > exp
+
+    @property
+    def is_valid(self) -> bool:
+        return self.status not in ("revoked",) and not self.is_expired
+
+    def verify(self):
+        """Mark the token as identity-verified."""
+        self.verified_at = datetime.now(timezone.utc)
+        self.status = "verified"
+        db.session.commit()
+
+    def mark_used(self):
+        if not self.used_at:
+            self.used_at = datetime.now(timezone.utc)
+        self.status = "used"
+        db.session.commit()
+
+    def revoke(self):
+        self.revoked_at = datetime.now(timezone.utc)
+        self.status = "revoked"
+        db.session.commit()
+
+    def __repr__(self) -> str:
+        return f"<ShareToken {self.token[:8]}… media={self.media_id} → user={self.recipient_id}>"
 
 
 # Flask-Login user loader

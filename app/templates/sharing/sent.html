@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Sent Shares — SecureMedia{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h2><i class="bi bi-send me-2" style="color:var(--sm-primary)"></i>Sent Shares</h2>
+  <span class="badge bg-primary fs-6">{{ tokens|length }} share{{ 's' if tokens|length != 1 }}</span>
+</div>
+
+{% if tokens %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Sent To</th>
+          <th>Permission</th>
+          <th>Status</th>
+          <th>Verified</th>
+          <th>Expires</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in tokens %}
+        <tr class="{{ 'opacity-50' if t.status == 'revoked' or t.is_expired }}">
+          <td>
+            {% if t.media.mime_type and 'video' in t.media.mime_type %}
+              <i class="bi bi-film me-2 text-info"></i>
+            {% else %}
+              <i class="bi bi-music-note-beamed me-2 text-warning"></i>
+            {% endif %}
+            <strong>{{ t.media.original_filename }}</strong>
+          </td>
+          <td>
+            <i class="bi bi-person-fill me-1 text-info"></i>{{ t.recipient.username }}
+            <br><small class="text-muted">{{ t.recipient.email }}</small>
+          </td>
+          <td>
+            {% if t.allow_download %}
+              <span class="badge bg-primary"><i class="bi bi-download me-1"></i>Download</span>
+            {% else %}
+              <span class="badge bg-secondary"><i class="bi bi-play-circle me-1"></i>Stream</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.status == 'revoked' %}
+              <span class="badge bg-danger">Revoked</span>
+            {% elif t.is_expired %}
+              <span class="badge bg-warning text-dark">Expired</span>
+            {% elif t.status == 'pending' %}
+              <span class="badge bg-warning text-dark">Pending</span>
+            {% elif t.status == 'verified' %}
+              <span class="badge bg-success">Verified</span>
+            {% elif t.status == 'used' %}
+              <span class="badge bg-info">Used</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if t.verified_at %}
+              <span class="text-success small"><i class="bi bi-check-circle me-1"></i>{{ t.verified_at.strftime('%b %d, %H:%M') }}</span>
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+          <td>
+            <span class="small {% if t.is_expired %}text-danger{% endif %}">
+              {{ t.expires_at.strftime('%b %d, %Y %H:%M') }}
+            </span>
+          </td>
+          <td class="text-end">
+            {% if t.status != 'revoked' and not t.is_expired %}
+            <form method="POST" action="{{ url_for('sharing.revoke_token', token=t.token) }}"
+                  class="d-inline" onsubmit="return confirm('Revoke access for {{ t.recipient.username }}?');">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-x-circle me-1"></i>Revoke
+              </button>
+            </form>
+            {% else %}
+            <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card text-center py-5">
+  <div class="card-body">
+    <i class="bi bi-send" style="font-size:3rem;color:var(--sm-text-muted)"></i>
+    <h5 class="mt-3">No shares sent</h5>
+    <p class="text-muted">Share a file from the file detail page to see it here.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}
